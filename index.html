@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ระบบสแกนเบิกน้ำยา</title>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #f0f4f8; margin: 0; padding: 16px; color: #1e293b; }
+    .container { max-width: 480px; margin: 0 auto; background: #ffffff; padding: 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    h2 { margin-top: 0; color: #0f172a; font-size: 20px; text-align: center; }
+
+    #reader { width: 100%; border-radius: 12px; overflow: hidden; margin-bottom: 12px; display: none; border: 2px solid #2563eb; }
+    .btn-scan { width: 100%; padding: 14px; font-size: 16px; font-weight: bold; color: #fff; background: #2563eb; border: none; border-radius: 10px; cursor: pointer; margin-bottom: 16px; }
+    .btn-scan.stop { background: #dc2626; }
+
+    .form-group { margin-bottom: 14px; }
+    label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 5px; color: #334155; }
+    label span.req { color: #ef4444; }
+    input, select { width: 100%; padding: 11px 12px; font-size: 16px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; }
+    input:focus, select:focus { outline: none; border-color: #2563eb; background: #fff; }
+    .auto-filled { background-color: #ecfdf5 !important; border-color: #10b981 !important; }
+
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .btn-submit { width: 100%; padding: 15px; font-size: 17px; font-weight: bold; color: #fff; background: #059669; border: none; border-radius: 10px; cursor: pointer; margin-top: 8px; }
+    .btn-submit:disabled { background: #94a3b8; cursor: not-allowed; }
+
+    .status-msg { margin-top: 12px; padding: 12px; border-radius: 8px; text-align: center; font-weight: 600; display: none; }
+    .status-success { background: #dcfce7; color: #166534; }
+    .status-error { background: #fee2e2; color: #991b1b; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>🧪 ฟอร์มสแกนเบิกน้ำยา</h2>
+
+  <button type="button" id="scanBtn" class="btn-scan" onclick="toggleScanner()">
+    📷 กดเพื่อสแกน QR Code น้ำยา
+  </button>
+  <div id="reader"></div>
+
+  <form id="reqForm" onsubmit="submitForm(event)">
+    <div class="form-group">
+      <label>ชื่อน้ำยา <span class="req">*</span></label>
+      <input type="text" id="itemName" required placeholder="สแกน QR หรือพิมพ์ชื่อน้ำยา">
+    </div>
+
+    <div class="row-2">
+      <div class="form-group">
+        <label>Lot No. <span class="req">*</span></label>
+        <input type="text" id="lotNo" required placeholder="เลข Lot">
+      </div>
+      <div class="form-group">
+        <label>วันหมดอายุ <span class="req">*</span></label>
+        <input type="text" id="expDate" required placeholder="YYYY-MM-DD">
+      </div>
+    </div>
+
+    <div class="row-2">
+      <div class="form-group">
+        <label>จุดเบิก / หน่วยงาน <span class="req">*</span></label>
+        <select id="department" required>
+          <option value="LAB">LAB</option>
+          <option value="ผู้ป่วยใน">ผู้ป่วยใน</option>
+          <option value="ห้องฉุกเฉิน">ห้องฉุกเฉิน</option>
+          <option value="OPD/ARI/TB">OPD/ARI/TB</option>
+          <option value="ห้องคลอด">ห้องคลอด</option>
+          <option value="จิตเวข">จิตเวข</option>
+          <option value="รพ.สต.">รพ.สต.</option>
+          <option value="PCU">PCU</option>
+          <option value="ผู้ป่วยนอก">ผู้ป่วยนอก</option>
+          <option value="NCD">NCD</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>จำนวนที่เบิก <span class="req">*</span></label>
+        <input type="number" id="quantity" min="1" value="1" required>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>วันที่เบิก <span class="req">*</span></label>
+      <input type="date" id="withdrawDate" required>
+    </div>
+
+    <button type="submit" id="submitBtn" class="btn-submit">💾 บันทึกเข้าแท็บ "เบิก"</button>
+    <div id="statusMsg" class="status-msg"></div>
+  </form>
+</div>
+
+<script>
+  // ใส่ Web app URL ที่ได้จากการ Deploy Apps Script ตรงนี้ครับ
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzvs1NQLn5MDoJ9G4KjBERxt5_X_LqBU5XMj_HmFP8hzxiitpybwpnvn1N-O6ciGfXe/exec";
+
+  let html5QrCode = null;
+  let isScanning = false;
+
+  window.onload = function() {
+    document.getElementById('withdrawDate').value = new Date().toISOString().split('T')[0];
+  };
+
+  function toggleScanner() {
+    const readerDiv = document.getElementById('reader');
+    const scanBtn = document.getElementById('scanBtn');
+
+    if (!isScanning) {
+      readerDiv.style.display = 'block';
+      scanBtn.innerHTML = '❌ ปิดกล้องสแกน';
+      scanBtn.classList.add('stop');
+      isScanning = true;
+
+      html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 240, height: 240 } },
+        onScanSuccess,
+        () => {}
+      ).catch(err => {
+        alert("เปิดกล้องไม่สำเร็จ: " + err);
+        stopScanner();
+      });
+    } else {
+      stopScanner();
+    }
+  }
+
+  function stopScanner() {
+    const readerDiv = document.getElementById('reader');
+    const scanBtn = document.getElementById('scanBtn');
+    if (html5QrCode && isScanning) {
+      html5QrCode.stop().then(() => {
+        html5QrCode.clear();
+        readerDiv.style.display = 'none';
+        scanBtn.innerHTML = '📷 กดเพื่อสแกน QR Code น้ำยา';
+        scanBtn.classList.remove('stop');
+        isScanning = false;
+      }).catch(err => console.error(err));
+    }
+  }
+
+  function onScanSuccess(decodedText) {
+    stopScanner();
+    if (decodedText.includes('#')) {
+      const parts = decodedText.split('#').map(s => s.trim());
+      setFieldValue('itemName', parts[0] || "");
+      setFieldValue('lotNo', parts[1] || "");
+      setFieldValue('expDate', parts[2] || "");
+    } else {
+      setFieldValue('itemName', decodedText.trim());
+    }
+  }
+
+  function setFieldValue(id, val) {
+    const el = document.getElementById(id);
+    el.value = val;
+    if (val) {
+      el.classList.add('auto-filled');
+      setTimeout(() => el.classList.remove('auto-filled'), 1800);
+    }
+  }
+
+  async function submitForm(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    const statusMsg = document.getElementById('statusMsg');
+
+    btn.disabled = true;
+    btn.innerText = "⏳ กำลังบันทึก...";
+    statusMsg.style.display = 'none';
+
+    const payload = {
+      itemName: document.getElementById('itemName').value,
+      lotNo: document.getElementById('lotNo').value,
+      expDate: document.getElementById('expDate').value,
+      department: document.getElementById('department').value,
+      quantity: document.getElementById('quantity').value,
+      withdrawDate: document.getElementById('withdrawDate').value
+    };
+
+    try {
+      // ใช้ mode: 'no-cors' เพื่อให้ส่งข้อมูลข้ามโดเมนไปยัง Google Apps Script ได้โดยไม่ติด CORS
+      await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload)
+      });
+
+      btn.disabled = false;
+      btn.innerText = '💾 บันทึกเข้าแท็บ "เบิก"';
+      statusMsg.style.display = 'block';
+      statusMsg.className = "status-msg status-success";
+      statusMsg.innerText = "✅ ส่งข้อมูลบันทึกเรียบร้อยแล้ว";
+
+      document.getElementById('itemName').value = "";
+      document.getElementById('lotNo').value = "";
+      document.getElementById('expDate').value = "";
+      document.getElementById('quantity').value = "1";
+    } catch (err) {
+      btn.disabled = false;
+      btn.innerText = '💾 บันทึกเข้าแท็บ "เบิก"';
+      statusMsg.style.display = 'block';
+      statusMsg.className = "status-msg status-error";
+      statusMsg.innerText = "❌ ส่งข้อมูลไม่สำเร็จ: " + err;
+    }
+  }
+</script>
+
+</body>
+</html>
