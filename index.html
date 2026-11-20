@@ -11,6 +11,19 @@
     .container { max-width: 480px; margin: 0 auto; background: #ffffff; padding: 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
     h2 { margin-top: 0; color: #0f172a; font-size: 20px; text-align: center; }
 
+    /* หน้าจอล็อกรหัสผ่าน */
+    #lockScreen { text-align: center; padding: 12px 0; }
+    .lock-icon { font-size: 40px; margin-bottom: 8px; }
+    .lock-desc { font-size: 14px; color: #64748b; margin-bottom: 16px; }
+    .pin-input { width: 100%; padding: 12px; font-size: 18px; text-align: center; letter-spacing: 6px; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 12px; }
+    .btn-unlock { width: 100%; padding: 13px; font-size: 16px; font-weight: bold; color: #fff; background: #1e293b; border: none; border-radius: 10px; cursor: pointer; }
+    .lock-error { color: #dc2626; font-size: 13px; margin-top: 8px; display: none; font-weight: 600; }
+
+    /* ส่วนฟอร์มหลัก */
+    #mainApp { display: none; }
+    .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .btn-lock { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 8px; padding: 6px 10px; font-size: 12px; cursor: pointer; font-weight: 600; }
+
     #reader { width: 100%; border-radius: 12px; overflow: hidden; margin-bottom: 12px; display: none; border: 2px solid #2563eb; }
     .btn-scan { width: 100%; padding: 14px; font-size: 16px; font-weight: bold; color: #fff; background: #2563eb; border: none; border-radius: 10px; cursor: pointer; margin-bottom: 16px; }
     .btn-scan.stop { background: #dc2626; }
@@ -34,72 +47,122 @@
 <body>
 
 <div class="container">
-  <h2>🧪 ฟอร์มสแกนเบิกน้ำยา</h2>
+  <!-- หน้าจอล็อกรหัสผ่าน -->
+  <div id="lockScreen">
+    <div class="lock-icon">🔒</div>
+    <h2>ยืนยันรหัสผ่านก่อนเข้าใช้งาน</h2>
+    <div class="lock-desc">กรอกรหัสผ่านเพื่อเข้าสู่ฟอร์มสแกนเบิกน้ำยา</div>
+    <input type="password" id="pinInput" class="pin-input" inputmode="numeric" placeholder="••••" onkeydown="if(event.key==='Enter') unlockApp()">
+    <button type="button" class="btn-unlock" onclick="unlockApp()">เข้าสู่ระบบ</button>
+    <div id="lockError" class="lock-error">รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง</div>
+  </div>
 
-  <button type="button" id="scanBtn" class="btn-scan" onclick="toggleScanner()">
-    📷 กดเพื่อสแกน QR Code น้ำยา
-  </button>
-  <div id="reader"></div>
-
-  <form id="reqForm" onsubmit="submitForm(event)">
-    <div class="form-group">
-      <label>ชื่อน้ำยา <span class="req">*</span></label>
-      <input type="text" id="itemName" required placeholder="สแกน QR หรือพิมพ์ชื่อน้ำยา">
+  <!-- หน้าฟอร์มเบิกน้ำยา -->
+  <div id="mainApp">
+    <div class="top-bar">
+      <h2 style="margin:0; font-size:19px;">🧪 ฟอร์มสแกนเบิกน้ำยา</h2>
+      <button type="button" class="btn-lock" onclick="lockApp()">🔒 ล็อกหน้าจอ</button>
     </div>
 
-    <div class="row-2">
-      <div class="form-group">
-        <label>Lot No. <span class="req">*</span></label>
-        <input type="text" id="lotNo" required placeholder="เลข Lot">
-      </div>
-      <div class="form-group">
-        <label>วันหมดอายุ <span class="req">*</span></label>
-        <input type="text" id="expDate" required placeholder="YYYY-MM-DD">
-      </div>
-    </div>
+    <button type="button" id="scanBtn" class="btn-scan" onclick="toggleScanner()">
+      📷 กดเพื่อสแกน QR Code น้ำยา
+    </button>
+    <div id="reader"></div>
 
-    <div class="row-2">
+    <form id="reqForm" onsubmit="submitForm(event)">
       <div class="form-group">
-        <label>จุดเบิก / หน่วยงาน <span class="req">*</span></label>
-        <select id="department" required>
-          <option value="LAB">LAB</option>
-          <option value="ผู้ป่วยใน">ผู้ป่วยใน</option>
-          <option value="ห้องฉุกเฉิน">ห้องฉุกเฉิน</option>
-          <option value="OPD/ARI/TB">OPD/ARI/TB</option>
-          <option value="ห้องคลอด">ห้องคลอด</option>
-          <option value="จิตเวข">จิตเวข</option>
-          <option value="รพ.สต.">รพ.สต.</option>
-          <option value="PCU">PCU</option>
-          <option value="ผู้ป่วยนอก">ผู้ป่วยนอก</option>
-          <option value="NCD">NCD</option>
-        </select>
+        <label>ชื่อน้ำยา <span class="req">*</span></label>
+        <input type="text" id="itemName" required placeholder="สแกน QR หรือพิมพ์ชื่อน้ำยา">
       </div>
-      <div class="form-group">
-        <label>จำนวนที่เบิก <span class="req">*</span></label>
-        <input type="number" id="quantity" min="1" value="1" required>
+
+      <div class="row-2">
+        <div class="form-group">
+          <label>Lot No. <span class="req">*</span></label>
+          <input type="text" id="lotNo" required placeholder="เลข Lot">
+        </div>
+        <div class="form-group">
+          <label>วันหมดอายุ <span class="req">*</span></label>
+          <input type="text" id="expDate" required placeholder="YYYY-MM-DD">
+        </div>
       </div>
-    </div>
 
-    <div class="form-group">
-      <label>วันที่เบิก <span class="req">*</span></label>
-      <input type="date" id="withdrawDate" required>
-    </div>
+      <div class="row-2">
+        <div class="form-group">
+          <label>จุดเบิก / หน่วยงาน <span class="req">*</span></label>
+          <select id="department" required>
+            <option value="LAB">LAB</option>
+            <option value="ผู้ป่วยใน">ผู้ป่วยใน</option>
+            <option value="ห้องฉุกเฉิน">ห้องฉุกเฉิน</option>
+            <option value="OPD/ARI/TB">OPD/ARI/TB</option>
+            <option value="ห้องคลอด">ห้องคลอด</option>
+            <option value="จิตเวข">จิตเวข</option>
+            <option value="รพ.สต.">รพ.สต.</option>
+            <option value="PCU">PCU</option>
+            <option value="ผู้ป่วยนอก">ผู้ป่วยนอก</option>
+            <option value="NCD">NCD</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>จำนวนที่เบิก <span class="req">*</span></label>
+          <input type="number" id="quantity" min="1" value="1" required>
+        </div>
+      </div>
 
-    <button type="submit" id="submitBtn" class="btn-submit">💾 บันทึกเข้าแท็บ "เบิก"</button>
-    <div id="statusMsg" class="status-msg"></div>
-  </form>
+      <div class="row-2">
+        <div class="form-group">
+          <label>ชื่อผู้เบิก <span class="req">*</span></label>
+          <input type="text" id="requester" required placeholder="ระบุชื่อผู้เบิก">
+        </div>
+        <div class="form-group">
+          <label>วันที่เบิก <span class="req">*</span></label>
+          <input type="date" id="withdrawDate" required>
+        </div>
+      </div>
+
+      <button type="submit" id="submitBtn" class="btn-submit">💾 บันทึกเข้าแท็บ "เบิก"</button>
+      <div id="statusMsg" class="status-msg"></div>
+    </form>
+  </div>
 </div>
 
 <script>
-  // ใส่ Web app URL ที่ได้จากการ Deploy Apps Script ตรงนี้ครับ
-  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzvs1NQLn5MDoJ9G4KjBERxt5_X_LqBU5XMj_HmFP8hzxiitpybwpnvn1N-O6ciGfXe/exec";
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxPveNRL9G1hF7hz8IhHtWWsaLoPJtN7r258EdbPrGn2HOac-BpspYVf0U1wvkNCIxi/exec";
+  const ACCESS_PIN = "11017"; // เปลี่ยนรหัสผ่านได้ที่นี่ครับ
 
   let html5QrCode = null;
   let isScanning = false;
 
   window.onload = function() {
     document.getElementById('withdrawDate').value = new Date().toISOString().split('T')[0];
+    if (sessionStorage.getItem("lab_qr_unlocked") === "true") {
+      showMainApp();
+    }
   };
+
+  function unlockApp() {
+    const inputPin = document.getElementById('pinInput').value.trim();
+    const errorEl = document.getElementById('lockError');
+    if (inputPin === ACCESS_PIN) {
+      sessionStorage.setItem("lab_qr_unlocked", "true");
+      errorEl.style.display = 'none';
+      showMainApp();
+    } else {
+      errorEl.style.display = 'block';
+    }
+  }
+
+  function showMainApp() {
+    document.getElementById('lockScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
+  }
+
+  function lockApp() {
+    stopScanner();
+    sessionStorage.removeItem("lab_qr_unlocked");
+    document.getElementById('pinInput').value = "";
+    document.getElementById('mainApp').style.display = 'none';
+    document.getElementById('lockScreen').style.display = 'block';
+  }
 
   function toggleScanner() {
     const readerDiv = document.getElementById('reader');
@@ -176,11 +239,11 @@
       expDate: document.getElementById('expDate').value,
       department: document.getElementById('department').value,
       quantity: document.getElementById('quantity').value,
+      requester: document.getElementById('requester').value,
       withdrawDate: document.getElementById('withdrawDate').value
     };
 
     try {
-      // ใช้ mode: 'no-cors' เพื่อให้ส่งข้อมูลข้ามโดเมนไปยัง Google Apps Script ได้โดยไม่ติด CORS
       await fetch(APPS_SCRIPT_URL, {
         method: "POST",
         mode: "no-cors",
