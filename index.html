@@ -143,6 +143,7 @@
 </div>
 
 <script>
+  // วางลิงก์ Web App (.../exec) ล่าสุดจากหน้า Deploy ของโปรเจกต์ที่มีไฟล์ "เบิก" ตรงนี้
   const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyl9tgpCq-6iTkkvrYve2TCmexqo7g-e-Fqy9lo10OmviqrkclHFXAwa869QsWX_BDu/exec";
   const ACCESS_PIN = "11017";
 
@@ -277,9 +278,10 @@
     statusMsg.style.display = 'none';
 
     const payload = {
-      itemName: document.getElementById('itemName').value,
-      lotNo: document.getElementById('lotNo').value,
-      expDate: document.getElementById('expDate').value,
+      rawQr: document.getElementById('rawQrInput').value.trim(),
+      itemName: document.getElementById('itemName').value.trim(),
+      lotNo: document.getElementById('lotNo').value.trim(),
+      expDate: document.getElementById('expDate').value.trim(),
       department: document.getElementById('department').value,
       quantity: document.getElementById('quantity').value,
       requester: document.getElementById('requester').value,
