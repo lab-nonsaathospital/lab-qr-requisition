@@ -958,9 +958,10 @@
     /**
      * การตั้งค่าระบบ
      */
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyXzfDfKTPN2mX2svZKYibJL7eMs-o9TsJ8uKHGz1pdJgLcg5V4aE5bv9kYtKowqLYF/exec";
-    const ACCESS_PIN = "11017"; // รหัสผ่านเข้าใช้งานตามมาตรฐาน
-    const AUTH_SESSION_KEY = "beik_screen_unlocked";
+    // URL Web App จาก Google Apps Script (Version 37/38 หรือ URL ใช้งานหลัก)
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7VrKpBwb9WrKU-gAq8GD3anT8IS7rM4bhjfyLfZenul2PSa29QT_QiBwcSbqQ4Esz/exec";
+    // รหัสผ่านเข้าใช้งาน (รองรับทั้ง "2570" และ "11017")
+    const ALLOWED_PINS = ["2570", "11017"];
 
     let html5QrCode = null;
     let isScanning = false;
@@ -969,33 +970,33 @@
     window.addEventListener("DOMContentLoaded", () => {
       setTodayDate();
       loadSavedPrefs();
-      checkScreenAuth();
+      // เมื่อกดลิงก์เข้ามาหรือเปิดหน้าจอ จะแสดงป๊อปอัพให้ใส่รหัสผ่านเสมอเพื่อความปลอดภัย
+      showLockScreen();
       setupQrInputListener();
     });
 
     /**
-     * ตรวจสอบสิทธิ์การปลดล็อกหน้าจอ
+     * แสดงหน้าต่างล็อกหน้าจอให้ใส่รหัสผ่านทันทีที่เปิดหน้าเว็บ
      */
-    function checkScreenAuth() {
-      const unlocked = sessionStorage.getItem(AUTH_SESSION_KEY) === "1";
+    function showLockScreen() {
       const overlay = document.getElementById("pinOverlay");
-      if (!unlocked) {
-        overlay.classList.add("show");
-        setTimeout(() => document.getElementById("pinInput").focus(), 60);
-      } else {
-        overlay.classList.remove("show");
-      }
+      overlay.classList.add("show");
+      const pinInput = document.getElementById("pinInput");
+      pinInput.value = "";
+      document.getElementById("pinError").textContent = "";
+      setTimeout(() => pinInput.focus(), 80);
     }
 
     /**
-     * ยืนยันรหัส PIN (2570)
+     * ยืนยันรหัส PIN (รองรับทั้ง 2570 และ 11017)
      */
     function verifyPin(e) {
       e.preventDefault();
       const input = document.getElementById("pinInput");
       const errorEl = document.getElementById("pinError");
-      if (input.value.trim() === ACCESS_PIN) {
-        sessionStorage.setItem(AUTH_SESSION_KEY, "1");
+      const val = input.value.trim();
+
+      if (ALLOWED_PINS.includes(val)) {
         input.value = "";
         errorEl.textContent = "";
         document.getElementById("pinOverlay").classList.remove("show");
@@ -1007,7 +1008,7 @@
     }
 
     /**
-     * ล็อกหน้าจอ
+     * ล็อกหน้าจอด้วยตนเอง
      */
     function lockScreen() {
       if (isScanning && html5QrCode) {
@@ -1017,11 +1018,7 @@
           isScanning = false;
         }).catch(() => {});
       }
-      sessionStorage.removeItem(AUTH_SESSION_KEY);
-      document.getElementById("pinError").textContent = "";
-      document.getElementById("pinInput").value = "";
-      document.getElementById("pinOverlay").classList.add("show");
-      setTimeout(() => document.getElementById("pinInput").focus(), 60);
+      showLockScreen();
     }
 
     /**
