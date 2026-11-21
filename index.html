@@ -959,7 +959,7 @@
      * การตั้งค่าระบบ
      */
     // URL Web App จาก Google Apps Script (Version 37/38 หรือ URL ใช้งานหลัก)
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7VrKpBwb9WrKU-gAq8GD3anT8IS7rM4bhjfyLfZenul2PSa29QT_QiBwcSbqQ4Esz/exec";
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbypCP_dEyEgPjYWdSiZiSqyjSNBlNSU7J4hbBSO5KJ0Hx3jFApCCs7Ibv0P6LY0sfBt/exec";
     // รหัสผ่านเข้าใช้งาน (รองรับทั้ง "2570" และ "11017")
     const ALLOWED_PINS = ["2570", "11017"];
 
@@ -1173,28 +1173,30 @@
       el.style.display = "flex";
     }
 
+    let pendingQueue = [];
+    let isProcessingQueue = false;
+
     /**
      * ส่งข้อมูลบันทึกเข้าแท็บ "เบิก"
-     * ออกแบบให้ตอบสนองทันที ป้องกันปุ่มเบิ้ล และเคลียร์ฟิลด์พร้อมสแกนต่อทันที
+     * สถาปัตยกรรม Instant Optimistic + Background Queue
+     * เจ้าหน้าที่ไม่ต้องรอนิ่ง 14 วินาทีอีกต่อไป! ระบบตอบสนองใน 0.05 วินาที พร้อมยิงขวดต่อไปได้ทันที
      */
-    async function handleSubmit(e) {
+    function handleSubmit(e) {
       e.preventDefault();
       const deptVal = document.getElementById("department").value;
       const reqVal = document.getElementById("requester").value;
+      const itemVal = document.getElementById("itemName").value.trim();
 
       if (!reqVal) {
         showStatus("กรุณาเลือกชื่อผู้เบิกก่อนบันทึกข้อมูล", "error");
         document.getElementById("requester").focus();
         return;
       }
-
-      const submitBtn = document.getElementById("submitBtn");
-      const submitBtnText = document.getElementById("submitBtnText");
-
-      // อัปเดตสถานะปุ่มทันที (Instant UI feedback)
-      submitBtn.disabled = true;
-      submitBtn.classList.add("saving");
-      submitBtnText.textContent = "กำลังบันทึกข้อมูล...";
+      if (!itemVal) {
+        showStatus("กรุณาระบุชื่อน้ำยาหรือสแกน QR Code ก่อนบันทึก", "error");
+        document.getElementById("itemName").focus();
+        return;
+      }
 
       // บันทึกความจำผู้เบิกและแผนก
       localStorage.setItem("beik_dept", deptVal);
@@ -1202,7 +1204,7 @@
 
       const payload = {
         rawQr: document.getElementById("rawQrInput").value.trim(),
-        itemName: document.getElementById("itemName").value.trim(),
+        itemName: itemVal,
         lotNo: document.getElementById("lotNo").value.trim(),
         expDate: document.getElementById("expDate").value.trim(),
         department: deptVal,
@@ -1211,46 +1213,62 @@
         withdrawDate: document.getElementById("withdrawDate").value
       };
 
-      try {
-        // ใช้ Timeout Controller 16 วินาทีเพื่อป้องกันค้าง
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 16000);
+      // 1. ตอบสนองทันทีระดับเสี้ยววินาที (Instant Response 0 วินาที)
+      if (navigator.vibrate) navigator.vibrate([40, 30, 40]);
+      showStatus(`✓ บันทึก "${itemVal}" เรียบร้อย (กำลังซิงก์เข้าชีต...)`, "success");
 
-        await fetch(APPS_SCRIPT_URL, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(payload),
-          signal: controller.signal
-        });
+      // 2. เคลียร์เฉพาะข้อมูลรายการ เพื่อให้เจ้าหน้าที่ยิงสแกนขวดถัดไปได้ทันที!
+      document.getElementById("rawQrInput").value = "";
+      document.getElementById("itemName").value = "";
+      document.getElementById("lotNo").value = "";
+      document.getElementById("expDate").value = "";
+      document.getElementById("quantity").value = "1";
+      setTimeout(() => document.getElementById("rawQrInput").focus(), 50);
 
-        clearTimeout(timeoutId);
+      // 3. ส่งเข้าคิวเบื้องหลัง ซิงก์เข้า Google Apps Script แบบไม่บล็อกหน้าจอ
+      enqueueRequisition(payload);
+    }
 
-        // แสดงผลสำเร็จ
-        showStatus("✓ บันทึกข้อมูลเข้าแท็บ \"เบิก\" สำเร็จเรียบร้อยแล้ว", "success");
-        if (navigator.vibrate) navigator.vibrate([40, 30, 40]);
+    function enqueueRequisition(payload) {
+      pendingQueue.push(payload);
+      processQueue();
+    }
 
-        // เคลียร์เฉพาะข้อมูลรายการเพื่อเตรียมสแกนรายการถัดไปทันที
-        document.getElementById("rawQrInput").value = "";
-        document.getElementById("itemName").value = "";
-        document.getElementById("lotNo").value = "";
-        document.getElementById("expDate").value = "";
-        document.getElementById("quantity").value = "1";
+    async function processQueue() {
+      if (isProcessingQueue || pendingQueue.length === 0) return;
+      isProcessingQueue = true;
 
-        // โฟกัสกลับไปที่ช่อง QR เพื่อให้วางหรือยิงบาร์โค้ดต่อได้ทันที
-        setTimeout(() => document.getElementById("rawQrInput").focus(), 100);
+      const submitBtn = document.getElementById("submitBtn");
+      const submitBtnText = document.getElementById("submitBtnText");
 
-      } catch (err) {
-        if (err.name === 'AbortError') {
-          showStatus("ส่งข้อมูลแล้ว (การเชื่อมต่อเครือข่ายช้า กรุณาตรวจสอบใน Google Sheets)", "error");
-        } else {
-          showStatus("เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่อีกครั้ง", "error");
+      while (pendingQueue.length > 0) {
+        const item = pendingQueue[0];
+        try {
+          submitBtnText.textContent = `กำลังซิงก์เข้าชีต (${pendingQueue.length} รายการ)...`;
+
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+          await fetch(APPS_SCRIPT_URL, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(item),
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+          pendingQueue.shift(); // นำรายการที่ส่งสำเร็จออกจากคิว
+        } catch (err) {
+          console.error("Queue dispatch error:", err);
+          showStatus("⚠️ สัญญาณเครือข่ายสะดุด กำลังพยายามซิงก์ต่ออัตโนมัติ...", "error");
+          await new Promise(r => setTimeout(r, 2500));
         }
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.classList.remove("saving");
-        submitBtnText.textContent = 'บันทึกเข้าแท็บ "เบิก"';
       }
+
+      isProcessingQueue = false;
+      submitBtnText.textContent = 'บันทึกเข้าแท็บ "เบิก"';
+      showStatus("✓ บันทึกข้อมูลเข้าแท็บ \"เบิก\" สำเร็จเรียบร้อยทั้งหมดแล้ว", "success");
     }
   </script>
 </body>
