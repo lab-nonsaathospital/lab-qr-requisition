@@ -959,9 +959,10 @@
      * การตั้งค่าระบบ
      */
     // URL Web App จาก Google Apps Script (Version 37/38 หรือ URL ใช้งานหลัก)
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbypCP_dEyEgPjYWdSiZiSqyjSNBlNSU7J4hbBSO5KJ0Hx3jFApCCs7Ibv0P6LY0sfBt/exec";
-    // รหัสผ่านเข้าใช้งาน (รองรับทั้ง "2570" และ "11017")
-    const ALLOWED_PINS = ["2570", "11017"];
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz0bHsXjLH0d2DHzESPbo52MC4NYZznjBdaW5Bt374oFtlKOhDb5ynT4xmptUPXbEjO/exec";
+    // รหัสผ่านเข้าใช้งาน (กำหนดเป็น 11017 เท่านั้น)
+    const REQUIRED_PIN = "11017";
+    let currentAuthPin = "";
 
     let html5QrCode = null;
     let isScanning = false;
@@ -979,6 +980,7 @@
      * แสดงหน้าต่างล็อกหน้าจอให้ใส่รหัสผ่านทันทีที่เปิดหน้าเว็บ
      */
     function showLockScreen() {
+      currentAuthPin = "";
       const overlay = document.getElementById("pinOverlay");
       overlay.classList.add("show");
       const pinInput = document.getElementById("pinInput");
@@ -988,7 +990,7 @@
     }
 
     /**
-     * ยืนยันรหัส PIN (รองรับทั้ง 2570 และ 11017)
+     * ยืนยันรหัส PIN (11017 เท่านั้น)
      */
     function verifyPin(e) {
       e.preventDefault();
@@ -996,7 +998,8 @@
       const errorEl = document.getElementById("pinError");
       const val = input.value.trim();
 
-      if (ALLOWED_PINS.includes(val)) {
+      if (val === REQUIRED_PIN) {
+        currentAuthPin = val;
         input.value = "";
         errorEl.textContent = "";
         document.getElementById("pinOverlay").classList.remove("show");
@@ -1198,11 +1201,17 @@
         return;
       }
 
+      if (!currentAuthPin || currentAuthPin !== REQUIRED_PIN) {
+        showLockScreen();
+        return;
+      }
+
       // บันทึกความจำผู้เบิกและแผนก
       localStorage.setItem("beik_dept", deptVal);
       localStorage.setItem("beik_user", reqVal);
 
       const payload = {
+        pin: currentAuthPin,
         rawQr: document.getElementById("rawQrInput").value.trim(),
         itemName: itemVal,
         lotNo: document.getElementById("lotNo").value.trim(),
