@@ -784,6 +784,12 @@
       if (!raw) return;
       fillFromQrText(raw);
     }
+    document.getElementById("rawQrInput").addEventListener("input", function () {
+  const val = this.value.trim();
+  if (val.includes("#") && val.split("#").length >= 2) {
+    fillFromQrText(val);
+  }
+});
 
     function fillFromQrText(text) {
       const parts = text.split("#").map(s => s.trim());
