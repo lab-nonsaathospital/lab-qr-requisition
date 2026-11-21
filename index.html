@@ -1,321 +1,684 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ระบบสแกนเบิกน้ำยา</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ฟอร์มบันทึกการเบิกวัสดุ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
-    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background-color: #f0f4f8; margin: 0; padding: 16px; color: #1e293b; }
-    .container { max-width: 480px; margin: 0 auto; background: #ffffff; padding: 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-    h2 { margin-top: 0; color: #0f172a; font-size: 20px; text-align: center; }
+    :root {
+      --forest-dark: #28502E;
+      --moss-green: #47682C;
+      --sage-soft: #E9F0E6;
+      --cream-card: rgba(255, 255, 252, 0.95);
+      --text-main: #1E2B20;
+      --text-muted: #5A6B5C;
+      --border-line: #D3DDD2;
+      --sky-top: #DCEEF8;
+      --sky-mid: #F1F7F0;
+    }
 
-    #lockScreen { text-align: center; padding: 12px 0; }
-    .lock-icon { font-size: 40px; margin-bottom: 8px; }
-    .lock-desc { font-size: 14px; color: #64748b; margin-bottom: 16px; }
-    .pin-input { width: 100%; padding: 12px; font-size: 18px; text-align: center; letter-spacing: 6px; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 12px; }
-    .btn-unlock { width: 100%; padding: 13px; font-size: 16px; font-weight: bold; color: #fff; background: #1e293b; border: none; border-radius: 10px; cursor: pointer; }
-    .lock-error { color: #dc2626; font-size: 13px; margin-top: 8px; display: none; font-weight: 600; }
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
 
-    #mainApp { display: none; }
-    .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-    .btn-lock { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 8px; padding: 6px 10px; font-size: 12px; cursor: pointer; font-weight: 600; }
+    body {
+      margin: 0;
+      padding: 20px 14px 48px;
+      font-family: 'IBM Plex Sans Thai', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text-main);
+      background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 55%, #E3ECE0 100%);
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
 
-    #reader { width: 100%; border-radius: 12px; overflow: hidden; margin-bottom: 12px; display: none; border: 2px solid #2563eb; }
-    .btn-scan { width: 100%; padding: 14px; font-size: 16px; font-weight: bold; color: #fff; background: #2563eb; border: none; border-radius: 10px; cursor: pointer; margin-bottom: 14px; }
-    .btn-scan.stop { background: #dc2626; }
+    .scenic-bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
 
-    .qr-paste-box { background: #f8fafc; border: 1px dashed #94a3b8; border-radius: 10px; padding: 12px; margin-bottom: 16px; }
-    .qr-paste-row { display: flex; gap: 8px; }
-    .btn-parse { padding: 10px 14px; font-size: 14px; font-weight: bold; color: #fff; background: #0284c7; border: none; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+    .scenic-bg svg {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 46vh;
+      min-height: 260px;
+    }
 
-    .form-group { margin-bottom: 14px; }
-    label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 5px; color: #334155; }
-    label span.req { color: #ef4444; }
-    input, select { width: 100%; padding: 11px 12px; font-size: 16px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; }
-    input:focus, select:focus { outline: none; border-color: #2563eb; background: #fff; }
-    .auto-filled { background-color: #ecfdf5 !important; border-color: #10b981 !important; }
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 480px;
+      margin: 0 auto;
+    }
 
-    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .btn-submit { width: 100%; padding: 15px; font-size: 17px; font-weight: bold; color: #fff; background: #059669; border: none; border-radius: 10px; cursor: pointer; margin-top: 8px; }
-    .btn-submit:disabled { background: #94a3b8; cursor: not-allowed; }
+    .card {
+      background: var(--cream-card);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(40, 80, 46, 0.14);
+      border-radius: 18px;
+      padding: 22px 20px 26px;
+      box-shadow: 0 12px 32px rgba(40, 80, 46, 0.08);
+    }
 
-    .status-msg { margin-top: 12px; padding: 12px; border-radius: 8px; text-align: center; font-weight: 600; display: none; }
-    .status-success { background: #dcfce7; color: #166534; }
-    .status-error { background: #fee2e2; color: #991b1b; }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border-line);
+    }
+
+    .title-group h1 {
+      margin: 0;
+      font-size: 1.22rem;
+      font-weight: 600;
+      color: var(--forest-dark);
+      letter-spacing: -0.01em;
+    }
+
+    .title-group p {
+      margin: 3px 0 0;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .btn-pill {
+      background: #FFFFFF;
+      border: 1px solid var(--border-line);
+      color: var(--forest-dark);
+      font-family: inherit;
+      font-size: 0.78rem;
+      font-weight: 500;
+      padding: 6px 11px;
+      border-radius: 999px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+
+    .btn-pill.active {
+      background: var(--sage-soft);
+      border-color: var(--moss-green);
+      color: var(--forest-dark);
+    }
+
+    .btn-scan {
+      width: 100%;
+      padding: 13px 16px;
+      background: var(--forest-dark);
+      color: #FFFFFF;
+      border: none;
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 0.98rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+
+    .btn-scan:hover {
+      background: #1F3F24;
+    }
+
+    .btn-scan:active {
+      transform: scale(0.99);
+    }
+
+    #reader {
+      width: 100%;
+      margin-top: 12px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border-line);
+      display: none;
+    }
+
+    .paste-box {
+      margin-top: 14px;
+      padding: 12px;
+      background: #F6F9F5;
+      border: 1px dashed #B8C8B6;
+      border-radius: 12px;
+    }
+
+    .paste-label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .paste-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .paste-row input {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .btn-parse {
+      background: var(--moss-green);
+      color: #FFFFFF;
+      border: none;
+      border-radius: 10px;
+      padding: 0 14px;
+      font-family: inherit;
+      font-size: 0.86rem;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .btn-parse:hover {
+      background: var(--forest-dark);
+    }
+
+    .form-section {
+      margin-top: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--forest-dark);
+    }
+
+    .req {
+      color: #B44332;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="date"],
+    input[type="password"],
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      font-family: inherit;
+      font-size: 0.94rem;
+      color: var(--text-main);
+      background: #FFFFFF;
+      border: 1px solid var(--border-line);
+      border-radius: 10px;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: var(--moss-green);
+      box-shadow: 0 0 0 3px rgba(71, 104, 44, 0.12);
+    }
+
+    input[readonly],
+    select:disabled {
+      background: #F1F5F0;
+      color: var(--text-muted);
+    }
+
+    .btn-submit {
+      margin-top: 6px;
+      width: 100%;
+      padding: 14px 16px;
+      background: var(--moss-green);
+      color: #FFFFFF;
+      border: none;
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .btn-submit:hover {
+      background: var(--forest-dark);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    .status-msg {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      text-align: center;
+      display: none;
+    }
+
+    .status-msg.success {
+      display: block;
+      background: #E6F2E6;
+      color: var(--forest-dark);
+      border: 1px solid #BDD6BE;
+    }
+
+    .status-msg.error {
+      display: block;
+      background: #FBECE9;
+      color: #8E2E20;
+      border: 1px solid #E8C0B9;
+    }
+
+    /* หน้าต่างกรอกรหัสผ่านเข้าใช้งาน */
+    .pin-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: rgba(24, 44, 27, 0.45);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .pin-overlay.show {
+      display: flex;
+    }
+
+    .pin-box {
+      width: 100%;
+      max-width: 360px;
+      background: #FFFFFF;
+      border: 1px solid var(--border-line);
+      border-radius: 16px;
+      padding: 22px 20px;
+      box-shadow: 0 16px 36px rgba(24, 44, 27, 0.18);
+    }
+
+    .pin-box h2 {
+      margin: 0 0 6px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--forest-dark);
+    }
+
+    .pin-box p {
+      margin: 0 0 14px;
+      font-size: 0.84rem;
+      color: var(--text-muted);
+    }
+
+    .pin-error {
+      margin-top: 8px;
+      font-size: 0.82rem;
+      color: #9E2A1C;
+      min-height: 18px;
+    }
+
+    .btn-pin {
+      margin-top: 8px;
+      width: 100%;
+      padding: 11px 14px;
+      background: var(--forest-dark);
+      color: #FFFFFF;
+      border: none;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .btn-pin:hover {
+      background: #1F3F24;
+    }
   </style>
 </head>
 <body>
 
-<div class="container">
-  <div id="lockScreen">
-    <div class="lock-icon">🔒</div>
-    <h2>ยืนยันรหัสผ่านก่อนเข้าใช้งาน</h2>
-    <div class="lock-desc">กรอกรหัสผ่านเพื่อเข้าสู่ฟอร์มสแกนเบิกน้ำยา</div>
-    <input type="password" id="pinInput" class="pin-input" inputmode="numeric" placeholder="••••" onkeydown="if(event.key==='Enter') unlockApp()">
-    <button type="button" class="btn-unlock" onclick="unlockApp()">เข้าสู่ระบบ</button>
-    <div id="lockError" class="lock-error">รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง</div>
-  </div>
-
-  <div id="mainApp">
-    <div class="top-bar">
-      <h2 style="margin:0; font-size:19px;">🧪 ฟอร์มสแกนเบิกน้ำยา</h2>
-      <button type="button" class="btn-lock" onclick="lockApp()">🔒 ล็อกหน้าจอ</button>
-    </div>
-
-    <button type="button" id="scanBtn" class="btn-scan" onclick="toggleScanner()">
-      📷 กดเพื่อสแกน QR Code น้ำยา
-    </button>
-    <div id="reader"></div>
-
-    <div class="qr-paste-box">
-      <label>📋 ก๊อปวางข้อความจาก QR แล้วแยกส่วนอัตโนมัติ</label>
-      <div class="qr-paste-row">
-        <input type="text" id="rawQrInput" placeholder="วางข้อความ QR เช่น ชื่อ#Lot#EXP" oninput="applyQrText(this.value)">
-        <button type="button" class="btn-parse" onclick="applyQrText(document.getElementById('rawQrInput').value)">แยกข้อมูล</button>
-      </div>
-    </div>
-
-    <form id="reqForm" onsubmit="submitForm(event)">
-      <div class="form-group">
-        <label>ชื่อน้ำยา <span class="req">*</span></label>
-        <input type="text" id="itemName" required placeholder="สแกน QR หรือพิมพ์ชื่อน้ำยา">
-      </div>
-
-      <div class="row-2">
-        <div class="form-group">
-          <label>Lot No. <span class="req">*</span></label>
-          <input type="text" id="lotNo" required placeholder="เลข Lot">
-        </div>
-        <div class="form-group">
-          <label>วันหมดอายุ <span class="req">*</span></label>
-          <input type="text" id="expDate" required placeholder="YYYY-MM-DD">
-        </div>
-      </div>
-
-      <div class="row-2">
-        <div class="form-group">
-          <label>จุดเบิก / หน่วยงาน <span class="req">*</span></label>
-          <select id="department" required>
-            <option value="LAB">LAB</option>
-            <option value="ผู้ป่วยใน">ผู้ป่วยใน</option>
-            <option value="ห้องฉุกเฉิน">ห้องฉุกเฉิน</option>
-            <option value="OPD/ARI/TB">OPD/ARI/TB</option>
-            <option value="ห้องคลอด">ห้องคลอด</option>
-            <option value="จิตเวข">จิตเวข</option>
-            <option value="รพ.สต.">รพ.สต.</option>
-            <option value="PCU">PCU</option>
-            <option value="ผู้ป่วยนอก">ผู้ป่วยนอก</option>
-            <option value="NCD">NCD</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>จำนวนที่เบิก <span class="req">*</span></label>
-          <input type="number" id="quantity" min="1" value="1" required>
-        </div>
-      </div>
-
-      <div class="row-2">
-        <div class="form-group">
-          <label>ชื่อผู้เบิก <span class="req">*</span></label>
-          <select id="requester" required>
-            <option value="" disabled selected>-- เลือกชื่อผู้เบิก --</option>
-            <option value="มาริณี">มาริณี</option>
-            <option value="ศิริพร">ศิริพร</option>
-            <option value="วิทิตานนท์">วิทิตานนท์</option>
-            <option value="พรรณทิภา">พรรณทิภา</option>
-            <option value="เด่นนภา">เด่นนภา</option>
-            <option value="จักรพล">จักรพล</option>
-            <option value="ปิยวรรณ">ปิยวรรณ</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>วันที่เบิก <span class="req">*</span></label>
-          <input type="date" id="withdrawDate" required>
-        </div>
-      </div>
-
-      <button type="submit" id="submitBtn" class="btn-submit">💾 บันทึกเข้าแท็บ "เบิก"</button>
-      <div id="statusMsg" class="status-msg"></div>
+  <!-- หน้าต่างยืนยันรหัสผ่านก่อนเข้าใช้งาน -->
+  <div id="pinOverlay" class="pin-overlay" aria-modal="true" role="dialog">
+    <form class="pin-box" onsubmit="verifyPin(event)">
+      <h2>ยืนยันรหัสผ่านเข้าใช้งาน</h2>
+      <p>กรอกรหัสผ่านเพื่อปลดล็อกหน้าสแกนและบันทึกการเบิกวัสดุ</p>
+      <input type="password" id="pinInput" inputmode="numeric" autocomplete="current-password" placeholder="กรอกรหัสผ่าน" required />
+      <div id="pinError" class="pin-error"></div>
+      <button type="submit" class="btn-pin">ปลดล็อกหน้าจอ</button>
     </form>
   </div>
-</div>
 
-<script>
-  // วางลิงก์ Web App (.../exec) ล่าสุดจากหน้า Deploy ของโปรเจกต์ที่มีไฟล์ "เบิก" ตรงนี้
-  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyHYVBWl1spGD_OxeEefMp_G1c9bKLiQFeJBbKdRHOYLEbZmQERHYILnKXOqCc9bzwO/exec";
-  const ACCESS_PIN = "11017";
+  <!-- ฉากหลังเนินเขาสบายตา -->
+  <div class="scenic-bg" aria-hidden="true">
+    <svg viewBox="0 0 1440 420" preserveAspectRatio="none">
+      <path fill="rgba(255,255,255,0.65)" d="M180,140 Q230,90 290,125 Q350,80 410,130 Q460,125 480,165 L140,165 Q145,135 180,140 Z"/>
+      <path fill="rgba(255,255,255,0.55)" d="M980,115 Q1040,65 1110,105 Q1170,70 1230,115 Q1280,110 1300,150 L940,150 Q945,115 980,115 Z"/>
+      <path fill="#8CA879" opacity="0.45" d="M0,250 Q320,170 720,235 T1440,210 L1440,420 L0,420 Z"/>
+      <path fill="#47682C" opacity="0.82" d="M0,285 Q420,215 860,280 T1440,255 L1440,420 L0,420 Z"/>
+      <path fill="#28502E" d="M0,335 Q360,290 780,340 T1440,315 L1440,420 L0,420 Z"/>
+    </svg>
+  </div>
 
-  let html5QrCode = null;
-  let isScanning = false;
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <div class="title-group">
+          <h1>บันทึกการเบิกวัสดุ</h1>
+          <p>สแกนคิวอาร์โค้ดหรือกรอกรายการเพื่อส่งเข้าคลัง</p>
+        </div>
+        <div class="header-actions">
+          <button type="button" id="lockBtn" class="btn-pill" onclick="toggleLock()">ล็อกค่าเริ่มต้น</button>
+          <button type="button" class="btn-pill" onclick="lockScreen()">ล็อกหน้าจอ</button>
+        </div>
+      </div>
 
-  window.onload = function() {
-    document.getElementById('withdrawDate').value = new Date().toISOString().split('T')[0];
-    if (sessionStorage.getItem("lab_qr_unlocked") === "true") {
-      showMainApp();
+      <button type="button" id="scanBtn" class="btn-scan" onclick="toggleScanner()">เปิดกล้องสแกน QR Code</button>
+      <div id="reader"></div>
+
+      <div class="paste-box">
+        <span class="paste-label">วางข้อความจาก QR เพื่อแยกข้อมูลอัตโนมัติ</span>
+        <div class="paste-row">
+          <input type="text" id="rawQrInput" placeholder="ชื่อรายการ#Lot#Exp" />
+          <button type="button" class="btn-parse" onclick="parseManualQr()">แยกข้อมูล</button>
+        </div>
+      </div>
+
+      <form id="reqForm" class="form-section" onsubmit="handleSubmit(event)">
+        <div class="form-group">
+          <label for="itemName">ชื่อน้ำยา / วัสดุ <span class="req">*</span></label>
+          <input type="text" id="itemName" placeholder="สแกน QR หรือระบุชื่อรายการ" required />
+        </div>
+
+        <div class="row-2">
+          <div class="form-group">
+            <label for="lotNo">Lot No. <span class="req">*</span></label>
+            <input type="text" id="lotNo" placeholder="ระบุเลข Lot" required />
+          </div>
+          <div class="form-group">
+            <label for="expDate">วันหมดอายุ <span class="req">*</span></label>
+            <input type="text" id="expDate" placeholder="YYYY-MM-DD" required />
+          </div>
+        </div>
+
+        <div class="row-2">
+          <div class="form-group">
+            <label for="department">จุดเบิก / หน่วยงาน <span class="req">*</span></label>
+            <select id="department" required>
+              <option value="LAB">LAB</option>
+              <option value="ผู้ป่วยใน">ผู้ป่วยใน</option>
+              <option value="ห้องฉุกเฉิน">ห้องฉุกเฉิน</option>
+              <option value="OPD/ARI/TB">OPD/ARI/TB</option>
+              <option value="ห้องคลอด">ห้องคลอด</option>
+              <option value="จิตเวช">จิตเวช</option>
+              <option value="รพ.สต.">รพ.สต.</option>
+              <option value="PCU">PCU</option>
+              <option value="ผู้ป่วยนอก">ผู้ป่วยนอก</option>
+              <option value="NCD">NCD</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="quantity">จำนวนที่เบิก <span class="req">*</span></label>
+            <input type="number" id="quantity" value="1" min="1" step="any" required />
+          </div>
+        </div>
+
+        <div class="row-2">
+          <div class="form-group">
+            <label for="requester">ชื่อผู้เบิก <span class="req">*</span></label>
+            <select id="requester" required>
+              <option value="" disabled selected>-- เลือกชื่อผู้เบิก --</option>
+              <option value="มาริณี">มาริณี</option>
+              <option value="ศิริพร">ศิริพร</option>
+              <option value="วิทิตานนท์">วิทิตานนท์</option>
+              <option value="พรรณทิภา">พรรณทิภา</option>
+              <option value="เด่นนภา">เด่นนภา</option>
+              <option value="จักรพล">จักรพล</option>
+              <option value="ปิยวรรณ">ปิยวรรณ</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="withdrawDate">วันที่เบิก <span class="req">*</span></label>
+            <input type="date" id="withdrawDate" required />
+          </div>
+        </div>
+
+        <button type="submit" id="submitBtn" class="btn-submit">บันทึกเข้าแท็บ "เบิก"</button>
+        <div id="statusMsg" class="status-msg"></div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyHYVBWl1spGD_OxeEefMp_G1c9bKLiQFeJBbKdRHOYLEbZmQERHYILnKXOqCc9bzwO/exec";
+    const ACCESS_PIN = "11017"; // เปลี่ยนรหัสผ่านเข้าใช้งานได้ที่นี่
+    const AUTH_SESSION_KEY = "beik_screen_unlocked";
+
+    let html5QrCode = null;
+    let isScanning = false;
+    let isLocked = false;
+
+    window.addEventListener("DOMContentLoaded", () => {
+      setTodayDate();
+      loadSavedPrefs();
+      checkScreenAuth();
+    });
+
+    function checkScreenAuth() {
+      const unlocked = sessionStorage.getItem(AUTH_SESSION_KEY) === "1";
+      const overlay = document.getElementById("pinOverlay");
+      if (!unlocked) {
+        overlay.classList.add("show");
+        setTimeout(() => document.getElementById("pinInput").focus(), 50);
+      } else {
+        overlay.classList.remove("show");
+      }
     }
-  };
 
-  function unlockApp() {
-    const inputPin = document.getElementById('pinInput').value.trim();
-    const errorEl = document.getElementById('lockError');
-    if (inputPin === ACCESS_PIN) {
-      sessionStorage.setItem("lab_qr_unlocked", "true");
-      errorEl.style.display = 'none';
-      showMainApp();
-    } else {
-      errorEl.style.display = 'block';
+    function verifyPin(e) {
+      e.preventDefault();
+      const input = document.getElementById("pinInput");
+      const errorEl = document.getElementById("pinError");
+      if (input.value.trim() === ACCESS_PIN) {
+        sessionStorage.setItem(AUTH_SESSION_KEY, "1");
+        input.value = "";
+        errorEl.textContent = "";
+        document.getElementById("pinOverlay").classList.remove("show");
+      } else {
+        errorEl.textContent = "รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง";
+        input.select();
+      }
     }
-  }
 
-  function showMainApp() {
-    document.getElementById('lockScreen').style.display = 'none';
-    document.getElementById('mainApp').style.display = 'block';
-  }
+    function lockScreen() {
+      if (isScanning && html5QrCode) {
+        html5QrCode.stop().then(() => {
+          document.getElementById("reader").style.display = "none";
+          document.getElementById("scanBtn").textContent = "เปิดกล้องสแกน QR Code";
+          isScanning = false;
+        }).catch(() => {});
+      }
+      sessionStorage.removeItem(AUTH_SESSION_KEY);
+      document.getElementById("pinError").textContent = "";
+      document.getElementById("pinInput").value = "";
+      document.getElementById("pinOverlay").classList.add("show");
+      setTimeout(() => document.getElementById("pinInput").focus(), 50);
+    }
 
-  function lockApp() {
-    stopScanner();
-    sessionStorage.removeItem("lab_qr_unlocked");
-    document.getElementById('pinInput').value = "";
-    document.getElementById('mainApp').style.display = 'none';
-    document.getElementById('lockScreen').style.display = 'block';
-  }
+    function setTodayDate() {
+      const today = new Date();
+      const offset = today.getTimezoneOffset();
+      const localDate = new Date(today.getTime() - offset * 60000);
+      document.getElementById("withdrawDate").value = localDate.toISOString().split("T")[0];
+    }
 
-  function toggleScanner() {
-    const readerDiv = document.getElementById('reader');
-    const scanBtn = document.getElementById('scanBtn');
+    function loadSavedPrefs() {
+      const savedDept = localStorage.getItem("beik_dept");
+      const savedUser = localStorage.getItem("beik_user");
+      if (savedDept) document.getElementById("department").value = savedDept;
+      if (savedUser) document.getElementById("requester").value = savedUser;
+    }
 
-    if (!isScanning) {
-      readerDiv.style.display = 'block';
-      scanBtn.innerHTML = '❌ ปิดกล้องสแกน';
-      scanBtn.classList.add('stop');
-      isScanning = true;
+    function toggleLock() {
+      isLocked = !isLocked;
+      const btn = document.getElementById("lockBtn");
+      const dept = document.getElementById("department");
+      const req = document.getElementById("requester");
+      const dateInput = document.getElementById("withdrawDate");
 
-      html5QrCode = new Html5Qrcode("reader", { verbose: false });
-      const config = {
-        fps: 15,
-        qrbox: function(viewfinderWidth, viewfinderHeight) {
-          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-          const boxSize = Math.floor(minEdge * 0.8);
-          return { width: boxSize, height: boxSize };
-        },
-        experimentalFeatures: {
-          useBarCodeDetectorIfSupported: true
-        }
-      };
+      dept.disabled = isLocked;
+      req.disabled = isLocked;
+      dateInput.readOnly = isLocked;
+
+      if (isLocked) {
+        btn.textContent = "ปลดล็อกค่า";
+        btn.classList.add("active");
+        localStorage.setItem("beik_dept", dept.value);
+        if (req.value) localStorage.setItem("beik_user", req.value);
+      } else {
+        btn.textContent = "ล็อกค่าเริ่มต้น";
+        btn.classList.remove("active");
+      }
+    }
+
+    function toggleScanner() {
+      const readerDiv = document.getElementById("reader");
+      const scanBtn = document.getElementById("scanBtn");
+
+      if (isScanning && html5QrCode) {
+        html5QrCode.stop().then(() => {
+          readerDiv.style.display = "none";
+          scanBtn.textContent = "เปิดกล้องสแกน QR Code";
+          isScanning = false;
+        }).catch(() => {});
+        return;
+      }
+
+      readerDiv.style.display = "block";
+      scanBtn.textContent = "ปิดกล้องสแกน";
+      html5QrCode = new Html5Qrcode("reader");
 
       html5QrCode.start(
-        { facingMode: { ideal: "environment" } },
-        config,
-        onScanSuccess,
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 230, height: 230 } },
+        (decodedText) => {
+          document.getElementById("rawQrInput").value = decodedText;
+          fillFromQrText(decodedText);
+          html5QrCode.stop().then(() => {
+            readerDiv.style.display = "none";
+            scanBtn.textContent = "เปิดกล้องสแกน QR Code";
+            isScanning = false;
+          });
+        },
         () => {}
-      ).catch(err => {
-        alert("เปิดกล้องไม่สำเร็จ: " + err);
-        stopScanner();
-      });
-    } else {
-      stopScanner();
-    }
-  }
-
-  function stopScanner() {
-    const readerDiv = document.getElementById('reader');
-    const scanBtn = document.getElementById('scanBtn');
-    if (html5QrCode && isScanning) {
-      html5QrCode.stop().then(() => {
-        html5QrCode.clear();
-        readerDiv.style.display = 'none';
-        scanBtn.innerHTML = '📷 กดเพื่อสแกน QR Code น้ำยา';
-        scanBtn.classList.remove('stop');
+      ).catch(() => {
+        showStatus("ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตการใช้กล้องหรือวางข้อความ QR แทน", "error");
+        readerDiv.style.display = "none";
+        scanBtn.textContent = "เปิดกล้องสแกน QR Code";
         isScanning = false;
-      }).catch(err => console.error(err));
-    }
-  }
-
-  function onScanSuccess(decodedText) {
-    stopScanner();
-    document.getElementById('rawQrInput').value = decodedText;
-    applyQrText(decodedText);
-  }
-
-  function applyQrText(text) {
-    if (!text) return;
-    let parts = [];
-    if (text.includes('#')) {
-      parts = text.split('#').map(s => s.trim());
-    } else if (text.includes('\n')) {
-      parts = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-    } else if (text.includes('|')) {
-      parts = text.split('|').map(s => s.trim());
-    }
-
-    if (parts.length > 0) {
-      setFieldValue('itemName', parts[0] || "");
-      setFieldValue('lotNo', parts[1] || "");
-      setFieldValue('expDate', parts[2] || "");
-    } else {
-      setFieldValue('itemName', text.trim());
-    }
-  }
-
-  function setFieldValue(id, val) {
-    const el = document.getElementById(id);
-    el.value = val;
-    if (val) {
-      el.classList.add('auto-filled');
-      setTimeout(() => el.classList.remove('auto-filled'), 1800);
-    }
-  }
-
-  async function submitForm(e) {
-    e.preventDefault();
-    const btn = document.getElementById('submitBtn');
-    const statusMsg = document.getElementById('statusMsg');
-
-    btn.disabled = true;
-    btn.innerText = "⏳ กำลังบันทึก...";
-    statusMsg.style.display = 'none';
-
-    const payload = {
-      rawQr: document.getElementById('rawQrInput').value.trim(),
-      itemName: document.getElementById('itemName').value.trim(),
-      lotNo: document.getElementById('lotNo').value.trim(),
-      expDate: document.getElementById('expDate').value.trim(),
-      department: document.getElementById('department').value,
-      quantity: document.getElementById('quantity').value,
-      requester: document.getElementById('requester').value,
-      withdrawDate: document.getElementById('withdrawDate').value
-    };
-
-    try {
-      await fetch(APPS_SCRIPT_URL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload)
       });
 
-      btn.disabled = false;
-      btn.innerText = '💾 บันทึกเข้าแท็บ "เบิก"';
-      statusMsg.style.display = 'block';
-      statusMsg.className = "status-msg status-success";
-      statusMsg.innerText = "✅ ส่งข้อมูลบันทึกเรียบร้อยแล้ว";
-
-      document.getElementById('rawQrInput').value = "";
-      document.getElementById('itemName').value = "";
-      document.getElementById('lotNo').value = "";
-      document.getElementById('expDate').value = "";
-      document.getElementById('quantity').value = "1";
-    } catch (err) {
-      btn.disabled = false;
-      btn.innerText = '💾 บันทึกเข้าแท็บ "เบิก"';
-      statusMsg.style.display = 'block';
-      statusMsg.className = "status-msg status-error";
-      statusMsg.innerText = "❌ ส่งข้อมูลไม่สำเร็จ: " + err;
+      isScanning = true;
     }
-  }
-</script>
 
+    function parseManualQr() {
+      const raw = document.getElementById("rawQrInput").value.trim();
+      if (!raw) return;
+      fillFromQrText(raw);
+    }
+
+    function fillFromQrText(text) {
+      const parts = text.split("#").map(s => s.trim());
+      if (parts[0]) document.getElementById("itemName").value = parts[0];
+      if (parts[1]) document.getElementById("lotNo").value = parts[1];
+      if (parts[2]) document.getElementById("expDate").value = parts[2];
+    }
+
+    function showStatus(msg, type) {
+      const el = document.getElementById("statusMsg");
+      el.textContent = msg;
+      el.className = "status-msg " + type;
+    }
+
+    async function handleSubmit(e) {
+      e.preventDefault();
+      const deptVal = document.getElementById("department").value;
+      const reqVal = document.getElementById("requester").value;
+
+      if (!reqVal) {
+        showStatus("กรุณาเลือกชื่อผู้เบิกก่อนบันทึกข้อมูล", "error");
+        return;
+      }
+
+      const submitBtn = document.getElementById("submitBtn");
+      submitBtn.disabled = true;
+      submitBtn.textContent = "กำลังบันทึกข้อมูล...";
+
+      localStorage.setItem("beik_dept", deptVal);
+      localStorage.setItem("beik_user", reqVal);
+
+      const payload = {
+        rawQr: document.getElementById("rawQrInput").value.trim(),
+        itemName: document.getElementById("itemName").value.trim(),
+        lotNo: document.getElementById("lotNo").value.trim(),
+        expDate: document.getElementById("expDate").value.trim(),
+        department: deptVal,
+        quantity: Number(document.getElementById("quantity").value) || 1,
+        requester: reqVal,
+        withdrawDate: document.getElementById("withdrawDate").value
+      };
+
+      try {
+        await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(payload)
+        });
+
+        showStatus("บันทึกข้อมูลเรียบร้อยแล้ว", "success");
+        document.getElementById("rawQrInput").value = "";
+        document.getElementById("itemName").value = "";
+        document.getElementById("lotNo").value = "";
+        document.getElementById("expDate").value = "";
+        document.getElementById("quantity").value = "1";
+      } catch (err) {
+        showStatus("เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่อีกครั้ง", "error");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'บันทึกเข้าแท็บ "เบิก"';
+      }
+    }
+  </script>
 </body>
 </html>
