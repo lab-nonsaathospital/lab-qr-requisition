@@ -3,22 +3,23 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>ฟอร์มบันทึกการเบิกวัสดุ</title>
+  <title>ระบบบันทึกการเบิกน้ำยาและวัสดุห้องปฏิบัติการ | โรงพยาบาลโนนสะอาด</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
     :root {
       --forest-dark: #28502E;
       --moss-green: #47682C;
-      --sage-soft: #E9F0E6;
-      --cream-card: rgba(255, 255, 252, 0.95);
-      --text-main: #1E2B20;
-      --text-muted: #5A6B5C;
-      --border-line: #D3DDD2;
-      --sky-top: #DCEEF8;
-      --sky-mid: #F1F7F0;
+      --leaf-bright: #D2E59E;
+      --sprout-soft: #DCEDB9;
+      --mist-slate: #B1C1C0;
+      --sage-tint: #EBF2E2;
+      --cream-card: rgba(255, 255, 252, 0.94);
+      --text-main: #1C2B1E;
+      --text-muted: #556657;
+      --border-line: #CFDCCA;
     }
 
     * {
@@ -28,15 +29,22 @@
 
     body {
       margin: 0;
-      padding: 20px 14px 48px;
+      padding: 20px 14px 56px;
       font-family: 'IBM Plex Sans Thai', -apple-system, BlinkMacSystemFont, sans-serif;
       color: var(--text-main);
-      background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 55%, #E3ECE0 100%);
+      background: linear-gradient(
+        180deg,
+        var(--mist-slate) 0%,
+        #DCE8DF 36%,
+        var(--sprout-soft) 72%,
+        var(--leaf-bright) 100%
+      );
       min-height: 100vh;
       position: relative;
       overflow-x: hidden;
     }
 
+    /* ฉากหลังท้องฟ้า ก้อนเมฆ ต้นไม้ และเนินเขา */
     .scenic-bg {
       position: fixed;
       inset: 0;
@@ -47,28 +55,39 @@
 
     .scenic-bg svg {
       position: absolute;
-      bottom: 0;
-      left: 0;
+      inset: 0;
       width: 100%;
-      height: 46vh;
-      min-height: 260px;
+      height: 100%;
     }
 
     .container {
       position: relative;
       z-index: 1;
-      max-width: 480px;
+      max-width: 490px;
       margin: 0 auto;
     }
 
     .card {
       background: var(--cream-card);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border: 1px solid rgba(40, 80, 46, 0.14);
-      border-radius: 18px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(40, 80, 46, 0.16);
+      border-radius: 20px;
       padding: 22px 20px 26px;
-      box-shadow: 0 12px 32px rgba(40, 80, 46, 0.08);
+      box-shadow: 0 14px 34px rgba(40, 80, 46, 0.12);
+    }
+
+    .org-badge {
+      display: inline-block;
+      background: var(--sage-tint);
+      border: 1px solid rgba(71, 104, 44, 0.25);
+      color: var(--forest-dark);
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 4px 11px;
+      border-radius: 999px;
+      margin-bottom: 8px;
+      line-height: 1.35;
     }
 
     .header {
@@ -83,32 +102,39 @@
 
     .title-group h1 {
       margin: 0;
-      font-size: 1.22rem;
-      font-weight: 600;
+      font-size: 1.24rem;
+      font-weight: 700;
       color: var(--forest-dark);
+      line-height: 1.35;
       letter-spacing: -0.01em;
     }
 
     .title-group p {
-      margin: 3px 0 0;
-      font-size: 0.82rem;
+      margin: 4px 0 0;
+      font-size: 0.83rem;
       color: var(--text-muted);
+      line-height: 1.4;
     }
 
     .header-actions {
       display: flex;
+      flex-direction: column;
       gap: 6px;
       flex-shrink: 0;
     }
 
     .btn-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
       background: #FFFFFF;
       border: 1px solid var(--border-line);
       color: var(--forest-dark);
       font-family: inherit;
-      font-size: 0.78rem;
+      font-size: 0.76rem;
       font-weight: 500;
-      padding: 6px 11px;
+      padding: 5px 10px;
       border-radius: 999px;
       cursor: pointer;
       white-space: nowrap;
@@ -116,12 +142,17 @@
     }
 
     .btn-pill.active {
-      background: var(--sage-soft);
+      background: var(--leaf-bright);
       border-color: var(--moss-green);
       color: var(--forest-dark);
+      font-weight: 600;
     }
 
     .btn-scan {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
       width: 100%;
       padding: 13px 16px;
       background: var(--forest-dark);
@@ -130,13 +161,13 @@
       border-radius: 12px;
       font-family: inherit;
       font-size: 0.98rem;
-      font-weight: 500;
+      font-weight: 600;
       cursor: pointer;
       transition: background 0.15s ease, transform 0.1s ease;
     }
 
     .btn-scan:hover {
-      background: #1F3F24;
+      background: #1E3E23;
     }
 
     .btn-scan:active {
@@ -155,8 +186,8 @@
     .paste-box {
       margin-top: 14px;
       padding: 12px;
-      background: #F6F9F5;
-      border: 1px dashed #B8C8B6;
+      background: #F5F9EE;
+      border: 1px dashed #B5C99A;
       border-radius: 12px;
     }
 
@@ -178,11 +209,15 @@
     }
 
     .btn-parse {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
       background: var(--moss-green);
       color: #FFFFFF;
       border: none;
       border-radius: 10px;
-      padding: 0 14px;
+      padding: 0 13px;
       font-family: inherit;
       font-size: 0.86rem;
       font-weight: 500;
@@ -215,7 +250,7 @@
 
     label {
       font-size: 0.85rem;
-      font-weight: 500;
+      font-weight: 600;
       color: var(--forest-dark);
     }
 
@@ -243,16 +278,20 @@
     input:focus,
     select:focus {
       border-color: var(--moss-green);
-      box-shadow: 0 0 0 3px rgba(71, 104, 44, 0.12);
+      box-shadow: 0 0 0 3px rgba(71, 104, 44, 0.15);
     }
 
     input[readonly],
     select:disabled {
-      background: #F1F5F0;
+      background: #EFF4EA;
       color: var(--text-muted);
     }
 
     .btn-submit {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
       margin-top: 6px;
       width: 100%;
       padding: 14px 16px;
@@ -287,9 +326,9 @@
 
     .status-msg.success {
       display: block;
-      background: #E6F2E6;
+      background: #E4F0DC;
       color: var(--forest-dark);
-      border: 1px solid #BDD6BE;
+      border: 1px solid #B6D0A7;
     }
 
     .status-msg.error {
@@ -304,7 +343,7 @@
       position: fixed;
       inset: 0;
       z-index: 50;
-      background: rgba(24, 44, 27, 0.45);
+      background: rgba(40, 80, 46, 0.42);
       backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px);
       display: none;
@@ -324,13 +363,33 @@
       border: 1px solid var(--border-line);
       border-radius: 16px;
       padding: 22px 20px;
-      box-shadow: 0 16px 36px rgba(24, 44, 27, 0.18);
+      box-shadow: 0 16px 36px rgba(40, 80, 46, 0.2);
+    }
+
+    .pin-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .padlock-badge {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--sage-tint);
+      border: 1px solid rgba(71, 104, 44, 0.25);
+      color: var(--forest-dark);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
     }
 
     .pin-box h2 {
-      margin: 0 0 6px;
-      font-size: 1.1rem;
-      font-weight: 600;
+      margin: 0;
+      font-size: 1.08rem;
+      font-weight: 700;
       color: var(--forest-dark);
     }
 
@@ -348,6 +407,10 @@
     }
 
     .btn-pin {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
       margin-top: 8px;
       width: 100%;
       padding: 11px 14px;
@@ -357,12 +420,24 @@
       border-radius: 10px;
       font-family: inherit;
       font-size: 0.95rem;
-      font-weight: 500;
+      font-weight: 600;
       cursor: pointer;
     }
 
     .btn-pin:hover {
-      background: #1F3F24;
+      background: #1E3E23;
+    }
+
+    .ico {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    .ico-sm {
+      width: 13px;
+      height: 13px;
+      flex-shrink: 0;
     }
   </style>
 </head>
@@ -371,46 +446,134 @@
   <!-- หน้าต่างยืนยันรหัสผ่านก่อนเข้าใช้งาน -->
   <div id="pinOverlay" class="pin-overlay" aria-modal="true" role="dialog">
     <form class="pin-box" onsubmit="verifyPin(event)">
-      <h2>ยืนยันรหัสผ่านเข้าใช้งาน</h2>
-      <p>กรอกรหัสผ่านเพื่อปลดล็อกหน้าสแกนและบันทึกการเบิกวัสดุ</p>
+      <div class="pin-header">
+        <span class="padlock-badge" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        </span>
+        <h2>ยืนยันรหัสผ่านเข้าใช้งาน</h2>
+      </div>
+      <p>ระบบบันทึกการเบิกน้ำยาและวัสดุห้องปฏิบัติการ โรงพยาบาลโนนสะอาด</p>
       <input type="password" id="pinInput" inputmode="numeric" autocomplete="current-password" placeholder="กรอกรหัสผ่าน" required />
       <div id="pinError" class="pin-error"></div>
-      <button type="submit" class="btn-pin">ปลดล็อกหน้าจอ</button>
+      <button type="submit" class="btn-pin">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+        </svg>
+        <span>ปลดล็อกหน้าจอ</span>
+      </button>
     </form>
   </div>
 
-  <!-- ฉากหลังเนินเขาสบายตา -->
+  <!-- ฉากหลังท้องฟ้า ก้อนเมฆ ต้นไม้ และเนินเขา (#B1C1C0, #DCEDB9, #D2E59E, #47682C, #28502E) -->
   <div class="scenic-bg" aria-hidden="true">
-    <svg viewBox="0 0 1440 420" preserveAspectRatio="none">
-      <path fill="rgba(255,255,255,0.65)" d="M180,140 Q230,90 290,125 Q350,80 410,130 Q460,125 480,165 L140,165 Q145,135 180,140 Z"/>
-      <path fill="rgba(255,255,255,0.55)" d="M980,115 Q1040,65 1110,105 Q1170,70 1230,115 Q1280,110 1300,150 L940,150 Q945,115 980,115 Z"/>
-      <path fill="#8CA879" opacity="0.45" d="M0,250 Q320,170 720,235 T1440,210 L1440,420 L0,420 Z"/>
-      <path fill="#47682C" opacity="0.82" d="M0,285 Q420,215 860,280 T1440,255 L1440,420 L0,420 Z"/>
-      <path fill="#28502E" d="M0,335 Q360,290 780,340 T1440,315 L1440,420 L0,420 Z"/>
+    <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMax slice">
+      <defs>
+        <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#B1C1C0" />
+          <stop offset="48%" stop-color="#DCE8DF" />
+          <stop offset="100%" stop-color="#DCEDB9" />
+        </linearGradient>
+      </defs>
+
+      <rect width="1440" height="900" fill="url(#skyGrad)" />
+
+      <!-- ก้อนเมฆนุ่มๆ บนท้องฟ้า -->
+      <g fill="#FFFFFF" opacity="0.72">
+        <path d="M130,150 Q165,105 220,128 Q265,92 320,126 Q365,124 382,162 L105,162 Q108,145 130,150 Z" />
+        <path d="M640,105 Q675,72 720,90 Q755,68 795,95 Q830,96 842,122 L620,122 Q622,106 640,105 Z" />
+        <path d="M1060,165 Q1100,118 1160,140 Q1210,105 1265,138 Q1310,138 1328,175 L1035,175 Q1038,158 1060,165 Z" />
+      </g>
+
+      <!-- เนินเขาไกล -->
+      <path fill="#D2E59E" d="M0,560 Q320,470 690,545 T1440,505 L1440,900 L0,900 Z" />
+
+      <!-- เนินเขากลาง -->
+      <path fill="#47682C" opacity="0.88" d="M0,635 Q390,555 820,625 T1440,590 L1440,900 L0,900 Z" />
+
+      <!-- ต้นไม้ด้านซ้าย -->
+      <g>
+        <rect x="92" y="610" width="12" height="55" rx="4" fill="#3B2E22" />
+        <circle cx="98" cy="592" r="32" fill="#47682C" />
+        <circle cx="76" cy="605" r="24" fill="#28502E" />
+        <circle cx="120" cy="605" r="25" fill="#28502E" />
+
+        <rect x="165" y="625" width="10" height="45" rx="3" fill="#3B2E22" />
+        <circle cx="170" cy="610" r="24" fill="#47682C" />
+        <circle cx="154" cy="618" r="18" fill="#28502E" />
+      </g>
+
+      <!-- ต้นไม้ด้านขวา -->
+      <g>
+        <rect x="1310" y="595" width="13" height="60" rx="4" fill="#3B2E22" />
+        <circle cx="1316" cy="575" r="35" fill="#47682C" />
+        <circle cx="1292" cy="590" r="26" fill="#28502E" />
+        <circle cx="1340" cy="590" r="27" fill="#28502E" />
+
+        <rect x="1235" y="620" width="10" height="45" rx="3" fill="#3B2E22" />
+        <circle cx="1240" cy="605" r="23" fill="#47682C" />
+        <circle cx="1256" cy="614" r="17" fill="#28502E" />
+      </g>
+
+      <!-- เนินเขาหน้า -->
+      <path fill="#28502E" d="M0,710 Q360,660 760,715 T1440,685 L1440,900 L0,900 Z" />
+
+      <!-- พุ่มไม้เตี้ย -->
+      <g>
+        <circle cx="55" cy="735" r="22" fill="#47682C" />
+        <circle cx="80" cy="742" r="18" fill="#DCEDB9" opacity="0.55" />
+        <circle cx="1385" cy="722" r="24" fill="#47682C" />
+        <circle cx="1360" cy="730" r="18" fill="#DCEDB9" opacity="0.55" />
+      </g>
     </svg>
   </div>
 
   <div class="container">
     <div class="card">
+      <div class="org-badge">กลุ่มงานเทคนิคการแพทย์ โรงพยาบาลโนนสะอาด จังหวัดอุดรธานี</div>
+
       <div class="header">
         <div class="title-group">
-          <h1>บันทึกการเบิกวัสดุ</h1>
-          <p>สแกนคิวอาร์โค้ดหรือกรอกรายการเพื่อส่งเข้าคลัง</p>
+          <h1>ระบบบันทึกการเบิกน้ำยาและวัสดุห้องปฏิบัติการ</h1>
+          <p>สแกนคิวอาร์โค้ดหรือกรอกรายการเพื่อบันทึกลงคลังวัสดุ</p>
         </div>
         <div class="header-actions">
           <button type="button" id="lockBtn" class="btn-pill" onclick="toggleLock()">ล็อกค่าเริ่มต้น</button>
-          <button type="button" class="btn-pill" onclick="lockScreen()">ล็อกหน้าจอ</button>
+          <button type="button" class="btn-pill" onclick="lockScreen()">
+            <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            <span>ล็อกหน้าจอ</span>
+          </button>
         </div>
       </div>
 
-      <button type="button" id="scanBtn" class="btn-scan" onclick="toggleScanner()">เปิดกล้องสแกน QR Code</button>
+      <button type="button" id="scanBtn" class="btn-scan" onclick="toggleScanner()">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+          <circle cx="12" cy="13" r="4"></circle>
+        </svg>
+        <span id="scanBtnText">เปิดกล้องสแกน QR Code</span>
+      </button>
       <div id="reader"></div>
 
       <div class="paste-box">
         <span class="paste-label">วางข้อความจาก QR เพื่อแยกข้อมูลอัตโนมัติ</span>
         <div class="paste-row">
           <input type="text" id="rawQrInput" placeholder="ชื่อรายการ#Lot#Exp" />
-          <button type="button" class="btn-parse" onclick="parseManualQr()">แยกข้อมูล</button>
+          <button type="button" class="btn-parse" onclick="parseManualQr()">
+            <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="16 3 21 3 21 8"></polyline>
+              <line x1="4" y1="20" x2="21" y2="3"></line>
+              <polyline points="21 16 21 21 16 21"></polyline>
+              <line x1="15" y1="15" x2="21" y2="21"></line>
+            </svg>
+            <span>แยกข้อมูล</span>
+          </button>
         </div>
       </div>
 
@@ -473,14 +636,19 @@
           </div>
         </div>
 
-        <button type="submit" id="submitBtn" class="btn-submit">บันทึกเข้าแท็บ "เบิก"</button>
+        <button type="submit" id="submitBtn" class="btn-submit">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          <span id="submitBtnText">บันทึกเข้าแท็บ "เบิก"</span>
+        </button>
         <div id="statusMsg" class="status-msg"></div>
       </form>
     </div>
   </div>
 
   <script>
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzDMlN1Fp1mxhM1P_I1pZZJ4ihPLc-yguOMVgsy_6BNNtvB0W-27qpf_dpC5Kpm4o3n/exec";
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyHYVBWl1spGD_OxeEefMp_G1c9bKLiQFeJBbKdRHOYLEbZmQERHYILnKXOqCc9bzwO/exec";
     const ACCESS_PIN = "11017"; // เปลี่ยนรหัสผ่านเข้าใช้งานได้ที่นี่
     const AUTH_SESSION_KEY = "beik_screen_unlocked";
 
@@ -524,7 +692,7 @@
       if (isScanning && html5QrCode) {
         html5QrCode.stop().then(() => {
           document.getElementById("reader").style.display = "none";
-          document.getElementById("scanBtn").textContent = "เปิดกล้องสแกน QR Code";
+          document.getElementById("scanBtnText").textContent = "เปิดกล้องสแกน QR Code";
           isScanning = false;
         }).catch(() => {});
       }
@@ -573,19 +741,19 @@
 
     function toggleScanner() {
       const readerDiv = document.getElementById("reader");
-      const scanBtn = document.getElementById("scanBtn");
+      const scanBtnText = document.getElementById("scanBtnText");
 
       if (isScanning && html5QrCode) {
         html5QrCode.stop().then(() => {
           readerDiv.style.display = "none";
-          scanBtn.textContent = "เปิดกล้องสแกน QR Code";
+          scanBtnText.textContent = "เปิดกล้องสแกน QR Code";
           isScanning = false;
         }).catch(() => {});
         return;
       }
 
       readerDiv.style.display = "block";
-      scanBtn.textContent = "ปิดกล้องสแกน";
+      scanBtnText.textContent = "ปิดกล้องสแกน";
       html5QrCode = new Html5Qrcode("reader");
 
       html5QrCode.start(
@@ -596,7 +764,7 @@
           fillFromQrText(decodedText);
           html5QrCode.stop().then(() => {
             readerDiv.style.display = "none";
-            scanBtn.textContent = "เปิดกล้องสแกน QR Code";
+            scanBtnText.textContent = "เปิดกล้องสแกน QR Code";
             isScanning = false;
           });
         },
@@ -604,7 +772,7 @@
       ).catch(() => {
         showStatus("ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตการใช้กล้องหรือวางข้อความ QR แทน", "error");
         readerDiv.style.display = "none";
-        scanBtn.textContent = "เปิดกล้องสแกน QR Code";
+        scanBtnText.textContent = "เปิดกล้องสแกน QR Code";
         isScanning = false;
       });
 
@@ -641,8 +809,9 @@
       }
 
       const submitBtn = document.getElementById("submitBtn");
+      const submitBtnText = document.getElementById("submitBtnText");
       submitBtn.disabled = true;
-      submitBtn.textContent = "กำลังบันทึกข้อมูล...";
+      submitBtnText.textContent = "กำลังบันทึกข้อมูล...";
 
       localStorage.setItem("beik_dept", deptVal);
       localStorage.setItem("beik_user", reqVal);
@@ -676,7 +845,7 @@
         showStatus("เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่อีกครั้ง", "error");
       } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = 'บันทึกเข้าแท็บ "เบิก"';
+        submitBtnText.textContent = 'บันทึกเข้าแท็บ "เบิก"';
       }
     }
   </script>
