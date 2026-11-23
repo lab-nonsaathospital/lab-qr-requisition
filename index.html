@@ -878,7 +878,7 @@
           <span>วางข้อความจาก QR เพื่อแยกข้อมูลอัตโนมัติ:</span>
         </span>
         <div class="paste-row">
-          <input type="text" id="rawQrInput" placeholder="ตัวอย่าง: ชื่อรายการ#Lot#Exp" autocomplete="off" />
+          <input type="text" id="rawQrInput" placeholder="สแกนหรือวางข้อมูลจาก QR Code ที่นี่..." autocomplete="off" />
           <button type="button" class="btn-parse" onclick="parseManualQr()">
             <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <polyline points="16 3 21 3 21 8"></polyline>
@@ -970,10 +970,10 @@
     /**
      * การตั้งค่าระบบและความปลอดภัย (Security & Session Config)
      */
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyUVmutEFOxJNbKPsSjvZSLUnm3sZcrI13U2AvohvA5CgxrdLzAo4ZmZHVvDD4Nx_kN/exec";
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzwjUC4ukl3iLYuGI8c3tI1PcECRhYXIYYTPzqkFKSt3qeVAOFEFMvDn55nLfkY7s4F/exec";
     const IDLE_TIMEOUT_MS = 10 * 60 * 1000;      // ล็อกหน้าจออัตโนมัติเมื่อไม่มีการใช้งาน 10 นาที (600,000 ms)
     const MAX_PIN_ATTEMPTS = 5;                  // จำนวนครั้งสูงสุดที่อนุญาตให้กรอก PIN ผิด
-    const LOCKOUT_DURATION_MS = 15 * 60 * 1000;  // ระยะเวลาล็อกชั่วคราวเมื่อผิดครบ 5 ครั้ง: 15 นาที (900,000 ms)
+    const LOCKOUT_DURATION_MS = 3 * 60 * 1000;   // ระยะเวลาล็อกชั่วคราวเมื่อผิดครบ 5 ครั้ง: 3 นาที (180,000 ms)
 
     // คีย์สำหรับจัดเก็บสถานะในเบราว์เซอร์ (ไม่มีรหัส PIN ฝังในโค้ด)
     const SESSION_UNLOCKED_KEY = "beik_session_unlocked";
@@ -995,6 +995,7 @@
       setupQrInputListener();
       setupIdleActivityListeners();
       restorePendingQueue();
+      prewarmBackend(); // ปลุก Google Apps Script ล่วงหน้าระหว่างที่ผู้ใช้กำลังพิมพ์รหัส PIN
 
       // ตรวจสอบสถานะการติดล็อก Brute-Force หรือสถานะ Session ปัจจุบัน
       const lockRemaining = getLockoutRemainingMs();
@@ -1011,6 +1012,13 @@
         showLockScreen();
       }
     });
+
+    /**
+     * ปลุกเซิร์ฟเวอร์ Google Apps Script ล่วงหน้าเพื่อลดอาการ Cold Start ตอนกดล็อกอิน
+     */
+    function prewarmBackend() {
+      fetch(APPS_SCRIPT_URL, { method: "GET", redirect: "follow" }).catch(() => {});
+    }
 
     /**
      * ล้างสถานะการปลดล็อกใน sessionStorage (ไม่กระทบคิวส่งข้อมูลใน localStorage)
