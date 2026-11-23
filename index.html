@@ -469,7 +469,7 @@
       border: 1px solid #EF9A9A;
     }
 
-    /* หน้าต่างกรอกรหัสผ่านเข้าใช้งาน (PIN Lock: 2570) */
+    /* หน้าต่างกรอกรหัสผ่านเข้าใช้งาน (PIN Lock) */
     .pin-overlay {
       position: fixed;
       inset: 0;
@@ -567,6 +567,18 @@
 
     .btn-pin:hover {
       background: linear-gradient(135deg, #1A381E 0%, #102413 100%);
+    }
+
+    .btn-pin:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    #pinInput:disabled {
+      background: #E9EFE7;
+      color: var(--text-muted);
+      cursor: not-allowed;
     }
 
     .ico {
@@ -791,7 +803,7 @@
   </div>
 
   <!-- ========================================================
-       หน้าต่างยืนยันรหัสผ่านเข้าใช้งาน (PIN Lock: "2570")
+       หน้าต่างยืนยันรหัสผ่านเข้าใช้งาน (PIN Lock)
        ======================================================== -->
   <div id="pinOverlay" class="pin-overlay" aria-modal="true" role="dialog">
     <form class="pin-box" onsubmit="verifyPin(event)">
@@ -805,14 +817,14 @@
         <h2>ยืนยันรหัสผ่านเข้าใช้งาน</h2>
       </div>
       <p>ระบบบันทึกการเบิกน้ำยาและวัสดุห้องปฏิบัติการ โรงพยาบาลโนนสะอาด</p>
-      <input type="password" id="pinInput" inputmode="numeric" autocomplete="current-password" placeholder="กรอกรหัส PIN (4 หลัก)" required />
+      <input type="password" id="pinInput" inputmode="numeric" autocomplete="current-password" placeholder="กรอกรหัส PIN" required />
       <div id="pinError" class="pin-error"></div>
-      <button type="submit" class="btn-pin">
+      <button type="submit" id="pinSubmitBtn" class="btn-pin">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
           <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
         </svg>
-        <span>ปลดล็อกหน้าจอ</span>
+        <span id="pinSubmitText">ปลดล็อกหน้าจอ</span>
       </button>
     </form>
   </div>
@@ -956,64 +968,242 @@
 
   <script>
     /**
-     * การตั้งค่าระบบ
+     * การตั้งค่าระบบและความปลอดภัย (Security & Session Config)
      */
-    // URL Web App จาก Google Apps Script (Version 37/38 หรือ URL ใช้งานหลัก)
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz0bHsXjLH0d2DHzESPbo52MC4NYZznjBdaW5Bt374oFtlKOhDb5ynT4xmptUPXbEjO/exec";
-    // รหัสผ่านเข้าใช้งาน (กำหนดเป็น 11017 เท่านั้น)
-    const REQUIRED_PIN = "11017";
-    let currentAuthPin = "";
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyUVmutEFOxJNbKPsSjvZSLUnm3sZcrI13U2AvohvA5CgxrdLzAo4ZmZHVvDD4Nx_kN/exec";
+    const IDLE_TIMEOUT_MS = 10 * 60 * 1000;      // ล็อกหน้าจออัตโนมัติเมื่อไม่มีการใช้งาน 10 นาที (600,000 ms)
+    const MAX_PIN_ATTEMPTS = 5;                  // จำนวนครั้งสูงสุดที่อนุญาตให้กรอก PIN ผิด
+    const LOCKOUT_DURATION_MS = 15 * 60 * 1000;  // ระยะเวลาล็อกชั่วคราวเมื่อผิดครบ 5 ครั้ง: 15 นาที (900,000 ms)
 
+    // คีย์สำหรับจัดเก็บสถานะในเบราว์เซอร์ (ไม่มีรหัส PIN ฝังในโค้ด)
+    const SESSION_UNLOCKED_KEY = "beik_session_unlocked";
+    const SESSION_PIN_KEY = "beik_session_pin";
+    const STORAGE_FAIL_COUNT_KEY = "beik_pin_fail_count";
+    const STORAGE_LOCK_UNTIL_KEY = "beik_pin_lock_until";
+    const STORAGE_QUEUE_KEY = "beik_pending_queue";
+
+    let currentAuthPin = "";
     let html5QrCode = null;
     let isScanning = false;
     let isLocked = false;
+    let idleTimerId = null;
+    let lockoutIntervalId = null;
 
     window.addEventListener("DOMContentLoaded", () => {
       setTodayDate();
       loadSavedPrefs();
-      // เมื่อกดลิงก์เข้ามาหรือเปิดหน้าจอ จะแสดงป๊อปอัพให้ใส่รหัสผ่านเสมอเพื่อความปลอดภัย
-      showLockScreen();
       setupQrInputListener();
+      setupIdleActivityListeners();
+      restorePendingQueue();
+
+      // ตรวจสอบสถานะการติดล็อก Brute-Force หรือสถานะ Session ปัจจุบัน
+      const lockRemaining = getLockoutRemainingMs();
+      const hasSession = sessionStorage.getItem(SESSION_UNLOCKED_KEY) === "1" && sessionStorage.getItem(SESSION_PIN_KEY);
+
+      if (lockRemaining > 0) {
+        clearSessionAuth();
+        showLockScreen();
+      } else if (hasSession) {
+        currentAuthPin = sessionStorage.getItem(SESSION_PIN_KEY);
+        document.getElementById("pinOverlay").classList.remove("show");
+        resetIdleTimer();
+      } else {
+        showLockScreen();
+      }
     });
 
     /**
-     * แสดงหน้าต่างล็อกหน้าจอให้ใส่รหัสผ่านทันทีที่เปิดหน้าเว็บ
+     * ล้างสถานะการปลดล็อกใน sessionStorage (ไม่กระทบคิวส่งข้อมูลใน localStorage)
      */
-    function showLockScreen() {
+    function clearSessionAuth() {
       currentAuthPin = "";
-      const overlay = document.getElementById("pinOverlay");
-      overlay.classList.add("show");
-      const pinInput = document.getElementById("pinInput");
-      pinInput.value = "";
-      document.getElementById("pinError").textContent = "";
-      setTimeout(() => pinInput.focus(), 80);
+      sessionStorage.removeItem(SESSION_UNLOCKED_KEY);
+      sessionStorage.removeItem(SESSION_PIN_KEY);
     }
 
     /**
-     * ยืนยันรหัส PIN (11017 เท่านั้น)
+     * คำนวณเวลาคงเหลือของการติดล็อก 15 นาที (ms) จาก localStorage
      */
-    function verifyPin(e) {
-      e.preventDefault();
-      const input = document.getElementById("pinInput");
-      const errorEl = document.getElementById("pinError");
-      const val = input.value.trim();
+    function getLockoutRemainingMs() {
+      const lockUntil = Number(localStorage.getItem(STORAGE_LOCK_UNTIL_KEY) || 0);
+      const now = Date.now();
+      if (lockUntil > now) {
+        return lockUntil - now;
+      }
+      if (lockUntil > 0 && lockUntil <= now) {
+        localStorage.removeItem(STORAGE_LOCK_UNTIL_KEY);
+        localStorage.removeItem(STORAGE_FAIL_COUNT_KEY);
+      }
+      return 0;
+    }
 
-      if (val === REQUIRED_PIN) {
-        currentAuthPin = val;
-        input.value = "";
-        errorEl.textContent = "";
-        document.getElementById("pinOverlay").classList.remove("show");
-        document.getElementById("rawQrInput").focus();
-      } else {
-        errorEl.textContent = "รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง";
-        input.select();
+    /**
+     * อัปเดตหน้าต่างล็อกและการนับถอยหลังแบบเรียลไทม์เมื่อกรอก PIN ผิดครบ 5 ครั้ง
+     */
+    function updateLockoutUI() {
+      if (lockoutIntervalId) {
+        clearInterval(lockoutIntervalId);
+        lockoutIntervalId = null;
+      }
+
+      const pinInput = document.getElementById("pinInput");
+      const pinBtn = document.getElementById("pinSubmitBtn");
+      const pinBtnText = document.getElementById("pinSubmitText");
+      const pinError = document.getElementById("pinError");
+
+      const tick = () => {
+        const remainingMs = getLockoutRemainingMs();
+        if (remainingMs > 0) {
+          pinInput.disabled = true;
+          pinBtn.disabled = true;
+          pinBtnText.textContent = "ระบบถูกล็อกชั่วคราว";
+
+          const totalSec = Math.ceil(remainingMs / 1000);
+          const mins = String(Math.floor(totalSec / 60)).padStart(2, "0");
+          const secs = String(totalSec % 60).padStart(2, "0");
+          pinError.textContent = `กรอกรหัสผิดเกิน ${MAX_PIN_ATTEMPTS} ครั้ง กรุณารออีก ${mins}:${secs} นาที`;
+          return true;
+        }
+
+        // ครบ 15 นาทีแล้ว: ปลดล็อกและคืนค่าปุ่มอัตโนมัติ
+        if (lockoutIntervalId) {
+          clearInterval(lockoutIntervalId);
+          lockoutIntervalId = null;
+        }
+        pinInput.disabled = false;
+        pinBtn.disabled = false;
+        pinBtnText.textContent = "ปลดล็อกหน้าจอ";
+        if (pinError.textContent.includes("กรอกรหัสผิดเกิน")) {
+          pinError.textContent = "";
+        }
+        return false;
+      };
+
+      if (tick()) {
+        lockoutIntervalId = setInterval(() => {
+          const stillLocked = tick();
+          if (!stillLocked) {
+            pinInput.focus();
+          }
+        }, 1000);
       }
     }
 
     /**
-     * ล็อกหน้าจอด้วยตนเอง
+     * แสดงหน้าต่างล็อกหน้าจอ
      */
-    function lockScreen() {
+    function showLockScreen(reasonMsg) {
+      clearTimeout(idleTimerId);
+      const overlay = document.getElementById("pinOverlay");
+      overlay.classList.add("show");
+
+      const pinInput = document.getElementById("pinInput");
+      const pinError = document.getElementById("pinError");
+      pinInput.value = "";
+      pinError.textContent = reasonMsg || "";
+
+      updateLockoutUI();
+
+      if (getLockoutRemainingMs() === 0) {
+        setTimeout(() => pinInput.focus(), 80);
+      }
+    }
+
+    /**
+     * ตรวจสอบรหัส PIN กับ Google Apps Script (ไม่มี Hardcoded PIN ในหน้าเว็บ)
+     */
+    async function verifyPin(e) {
+      e.preventDefault();
+      if (getLockoutRemainingMs() > 0) {
+        updateLockoutUI();
+        return;
+      }
+
+      const input = document.getElementById("pinInput");
+      const errorEl = document.getElementById("pinError");
+      const pinBtn = document.getElementById("pinSubmitBtn");
+      const pinBtnText = document.getElementById("pinSubmitText");
+      const val = input.value.trim();
+
+      if (!val) {
+        input.focus();
+        return;
+      }
+
+      pinBtn.disabled = true;
+      pinBtnText.textContent = "กำลังตรวจสอบ...";
+      errorEl.textContent = "";
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+        const response = await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          redirect: "follow",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "verifyPin", pin: val }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+        const res = await response.json();
+
+        if (res.status === "ok") {
+          // ปลดล็อกสำเร็จ: รีเซ็ตตัวนับผิดและเริ่มจับเวลา Idle 10 นาที
+          localStorage.removeItem(STORAGE_FAIL_COUNT_KEY);
+          localStorage.removeItem(STORAGE_LOCK_UNTIL_KEY);
+          currentAuthPin = val;
+          sessionStorage.setItem(SESSION_UNLOCKED_KEY, "1");
+          sessionStorage.setItem(SESSION_PIN_KEY, val);
+
+          input.value = "";
+          errorEl.textContent = "";
+          pinBtn.disabled = false;
+          pinBtnText.textContent = "ปลดล็อกหน้าจอ";
+          document.getElementById("pinOverlay").classList.remove("show");
+          resetIdleTimer();
+          document.getElementById("rawQrInput").focus();
+          return;
+        }
+
+        if (res.status === "locked") {
+          const lockUntil = res.lockUntil || (Date.now() + (res.retryAfterSec ? res.retryAfterSec * 1000 : LOCKOUT_DURATION_MS));
+          localStorage.setItem(STORAGE_FAIL_COUNT_KEY, String(MAX_PIN_ATTEMPTS));
+          localStorage.setItem(STORAGE_LOCK_UNTIL_KEY, String(lockUntil));
+          input.value = "";
+          updateLockoutUI();
+          return;
+        }
+
+        // กรอกรหัสผิด (ยังไม่ครบ 5 ครั้ง)
+        const failCount = res.failCount || (Number(localStorage.getItem(STORAGE_FAIL_COUNT_KEY) || 0) + 1);
+        localStorage.setItem(STORAGE_FAIL_COUNT_KEY, String(failCount));
+
+        if (failCount >= MAX_PIN_ATTEMPTS) {
+          localStorage.setItem(STORAGE_LOCK_UNTIL_KEY, String(Date.now() + LOCKOUT_DURATION_MS));
+          input.value = "";
+          updateLockoutUI();
+          return;
+        }
+
+        const remaining = MAX_PIN_ATTEMPTS - failCount;
+        errorEl.textContent = res.message || `รหัสผ่านไม่ถูกต้อง (เหลือโอกาสอีก ${remaining} ครั้ง)`;
+        pinBtn.disabled = false;
+        pinBtnText.textContent = "ปลดล็อกหน้าจอ";
+        input.select();
+      } catch (err) {
+        console.error("Verify PIN error:", err);
+        errorEl.textContent = "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อตรวจสอบรหัสได้ กรุณาลองใหม่อีกครั้ง";
+        pinBtn.disabled = false;
+        pinBtnText.textContent = "ปลดล็อกหน้าจอ";
+      }
+    }
+
+    /**
+     * ปิดกล้องสแกน QR (ถ้าเปิดอยู่)
+     */
+    function stopScannerIfActive() {
       if (isScanning && html5QrCode) {
         html5QrCode.stop().then(() => {
           document.getElementById("reader").style.display = "none";
@@ -1021,7 +1211,42 @@
           isScanning = false;
         }).catch(() => {});
       }
+    }
+
+    /**
+     * ล็อกหน้าจอด้วยตนเอง
+     */
+    function lockScreen() {
+      stopScannerIfActive();
+      clearSessionAuth();
       showLockScreen();
+    }
+
+    /**
+     * ระบบตรวจจับการไม่มีการใช้งาน (Idle Session Timeout: 10 นาที)
+     */
+    function setupIdleActivityListeners() {
+      const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll"];
+      events.forEach(evt => {
+        window.addEventListener(evt, () => {
+          const overlay = document.getElementById("pinOverlay");
+          if (overlay && !overlay.classList.contains("show")) {
+            resetIdleTimer();
+          }
+        }, { passive: true });
+      });
+    }
+
+    function resetIdleTimer() {
+      clearTimeout(idleTimerId);
+      idleTimerId = setTimeout(() => {
+        const overlay = document.getElementById("pinOverlay");
+        if (overlay && !overlay.classList.contains("show")) {
+          stopScannerIfActive();
+          clearSessionAuth();
+          showLockScreen("ล็อกหน้าจออัตโนมัติเนื่องจากไม่มีการใช้งานเกิน 10 นาที");
+        }
+      }, IDLE_TIMEOUT_MS);
     }
 
     /**
@@ -1082,7 +1307,7 @@
     }
 
     /**
-     * เปิด/ปิดกล้องสแกน QR Code
+     * เปิด/ปิดกล้องสแกน QR Code (ปรับจูนความไวสูง + Native BarcodeDetector)
      */
     function toggleScanner() {
       const readerDiv = document.getElementById("reader");
@@ -1099,12 +1324,36 @@
 
       readerDiv.style.display = "block";
       scanBtnText.textContent = "ปิดกล้องสแกน";
-      html5QrCode = new Html5Qrcode("reader");
+
+      const scannerConfig = {
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+      };
+      if (typeof Html5QrcodeSupportedFormats !== "undefined") {
+        scannerConfig.formatsToSupport = [Html5QrcodeSupportedFormats.QR_CODE];
+      }
+      html5QrCode = new Html5Qrcode("reader", scannerConfig);
+
+      const startConfig = {
+        fps: 20,
+        qrbox: (viewfinderWidth, viewfinderHeight) => {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          const size = Math.max(180, Math.floor(minEdge * 0.78));
+          return { width: size, height: size };
+        },
+        aspectRatio: 1.0,
+        videoConstraints: {
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          advanced: [{ focusMode: "continuous" }]
+        }
+      };
 
       html5QrCode.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 240, height: 240 } },
+        startConfig,
         (decodedText) => {
+          resetIdleTimer();
           document.getElementById("rawQrInput").value = decodedText;
           fillFromQrText(decodedText);
           if (navigator.vibrate) navigator.vibrate(50);
@@ -1179,13 +1428,37 @@
     let pendingQueue = [];
     let isProcessingQueue = false;
 
+    function savePendingQueue() {
+      try {
+        localStorage.setItem(STORAGE_QUEUE_KEY, JSON.stringify(pendingQueue));
+      } catch (e) {
+        console.warn("Unable to persist queue:", e);
+      }
+    }
+
+    function restorePendingQueue() {
+      try {
+        const raw = localStorage.getItem(STORAGE_QUEUE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            pendingQueue = parsed;
+            processQueue();
+          }
+        }
+      } catch (e) {
+        console.warn("Unable to restore queue:", e);
+      }
+    }
+
     /**
      * ส่งข้อมูลบันทึกเข้าแท็บ "เบิก"
-     * สถาปัตยกรรม Instant Optimistic + Background Queue
-     * เจ้าหน้าที่ไม่ต้องรอนิ่ง 14 วินาทีอีกต่อไป! ระบบตอบสนองใน 0.05 วินาที พร้อมยิงขวดต่อไปได้ทันที
+     * สถาปัตยกรรม Instant Optimistic + Persistent Background Queue
      */
     function handleSubmit(e) {
       e.preventDefault();
+      resetIdleTimer();
+
       const deptVal = document.getElementById("department").value;
       const reqVal = document.getElementById("requester").value;
       const itemVal = document.getElementById("itemName").value.trim();
@@ -1201,8 +1474,9 @@
         return;
       }
 
-      if (!currentAuthPin || currentAuthPin !== REQUIRED_PIN) {
-        showLockScreen();
+      if (!currentAuthPin) {
+        clearSessionAuth();
+        showLockScreen("กรุณายืนยันรหัสผ่านก่อนบันทึกข้อมูล");
         return;
       }
 
@@ -1211,6 +1485,8 @@
       localStorage.setItem("beik_user", reqVal);
 
       const payload = {
+        action: "save",
+        clientTxId: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         pin: currentAuthPin,
         rawQr: document.getElementById("rawQrInput").value.trim(),
         itemName: itemVal,
@@ -1234,12 +1510,13 @@
       document.getElementById("quantity").value = "1";
       setTimeout(() => document.getElementById("rawQrInput").focus(), 50);
 
-      // 3. ส่งเข้าคิวเบื้องหลัง ซิงก์เข้า Google Apps Script แบบไม่บล็อกหน้าจอ
+      // 3. ส่งเข้าคิวเบื้องหลังและบันทึกลง localStorage (ไม่หายแม้ล็อกหน้าจอ/รีเฟรช)
       enqueueRequisition(payload);
     }
 
     function enqueueRequisition(payload) {
       pendingQueue.push(payload);
+      savePendingQueue();
       processQueue();
     }
 
@@ -1247,8 +1524,8 @@
       if (isProcessingQueue || pendingQueue.length === 0) return;
       isProcessingQueue = true;
 
-      const submitBtn = document.getElementById("submitBtn");
       const submitBtnText = document.getElementById("submitBtnText");
+      let abortedByAuth = false;
 
       while (pendingQueue.length > 0) {
         const item = pendingQueue[0];
@@ -1258,26 +1535,47 @@
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 20000);
 
-          await fetch(APPS_SCRIPT_URL, {
+          // ส่งแบบ Simple CORS Request เพื่อให้อ่าน JSON ตอบกลับจาก Google Apps Script ได้จริง
+          const response = await fetch(APPS_SCRIPT_URL, {
             method: "POST",
-            mode: "no-cors",
+            redirect: "follow",
             headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify(item),
             signal: controller.signal
           });
 
           clearTimeout(timeoutId);
-          pendingQueue.shift(); // นำรายการที่ส่งสำเร็จออกจากคิว
+          const res = await response.json();
+
+          if (res.status === "success") {
+            pendingQueue.shift();
+            savePendingQueue();
+          } else if (res.status === "locked" || res.status === "unauthorized") {
+            abortedByAuth = true;
+            if (res.status === "locked") {
+              const lockUntil = res.lockUntil || (Date.now() + (res.retryAfterSec ? res.retryAfterSec * 1000 : LOCKOUT_DURATION_MS));
+              localStorage.setItem(STORAGE_FAIL_COUNT_KEY, String(MAX_PIN_ATTEMPTS));
+              localStorage.setItem(STORAGE_LOCK_UNTIL_KEY, String(lockUntil));
+            }
+            clearSessionAuth();
+            showLockScreen(res.message || "การยืนยันตัวตนไม่ถูกต้อง กรุณากรอกรหัส PIN ใหม่");
+            showStatus(`⚠️ ${res.message || "ส่งข้อมูลไม่สำเร็จ: รหัสผ่านไม่ถูกต้อง"}`, "error");
+            break;
+          } else {
+            throw new Error(res.message || "Server error");
+          }
         } catch (err) {
           console.error("Queue dispatch error:", err);
-          showStatus("⚠️ สัญญาณเครือข่ายสะดุด กำลังพยายามซิงก์ต่ออัตโนมัติ...", "error");
+          showStatus(`⚠️ สัญญาณเครือข่ายสะดุด ค้างซิงก์ ${pendingQueue.length} รายการ กำลังพยายามส่งต่อ...`, "error");
           await new Promise(r => setTimeout(r, 2500));
         }
       }
 
       isProcessingQueue = false;
       submitBtnText.textContent = 'บันทึกเข้าแท็บ "เบิก"';
-      showStatus("✓ บันทึกข้อมูลเข้าแท็บ \"เบิก\" สำเร็จเรียบร้อยทั้งหมดแล้ว", "success");
+      if (!abortedByAuth && pendingQueue.length === 0) {
+        showStatus("✓ บันทึกข้อมูลเข้าแท็บ \"เบิก\" สำเร็จเรียบร้อยทั้งหมดแล้ว", "success");
+      }
     }
   </script>
 </body>
