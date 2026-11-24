@@ -469,6 +469,46 @@
       border: 1px solid #EF9A9A;
     }
 
+    /* แถบแจ้งเตือนวันหมดอายุอัตโนมัติ (LA / ISO 15189 Guardrail) */
+    .exp-alert {
+      display: none;
+      margin-top: -4px;
+      margin-bottom: 12px;
+      padding: 10px 13px;
+      border-radius: 10px;
+      font-size: 0.86rem;
+      font-weight: 600;
+      line-height: 1.45;
+      animation: fadeInMsg 0.2s ease-out;
+    }
+
+    .exp-alert.safe {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #E8F5E9;
+      color: #2E7D32;
+      border: 1px solid #A5D6A7;
+    }
+
+    .exp-alert.warning {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #FFF8E1;
+      color: #B26A00;
+      border: 1px solid #FFE082;
+    }
+
+    .exp-alert.expired {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #FFEBEE;
+      color: #C62828;
+      border: 1.5px solid #EF5350;
+    }
+
     /* หน้าต่างกรอกรหัสผ่านเข้าใช้งาน (PIN Lock) */
     .pin-overlay {
       position: fixed;
@@ -909,6 +949,9 @@
           </div>
         </div>
 
+        <!-- แถบแจ้งเตือนสถานะวันหมดอายุอัตโนมัติ -->
+        <div id="expAlertBox" class="exp-alert" role="status" aria-live="polite"></div>
+
         <div class="row-2">
           <div class="form-group">
             <label for="department">จุดเบิก / หน่วยงาน <span class="req">*</span></label>
@@ -970,7 +1013,7 @@
     /**
      * การตั้งค่าระบบและความปลอดภัย (Security & Session Config)
      */
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyuXm78__hDOCLATKXewofvNTqOQXxHzmtRHoHLcie16nYfDmYJlMgJi-sGYK_fpJjy/exec";
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyXzfDfKTPN2mX2svZKYibJL7eMs-o9TsJ8uKHGz1pdJgLcg5V4aE5bv9kYtKowqLYF/exec";
     const IDLE_TIMEOUT_MS = 10 * 60 * 1000;      // ล็อกหน้าจออัตโนมัติเมื่อไม่มีการใช้งาน 10 นาที (600,000 ms)
     const MAX_PIN_ATTEMPTS = 5;                  // จำนวนครั้งสูงสุดที่อนุญาตให้กรอก PIN ผิด
     const LOCKOUT_DURATION_MS = 3 * 60 * 1000;   // ระยะเวลาล็อกชั่วคราวเมื่อผิดครบ 5 ครั้ง: 3 นาที (180,000 ms)
@@ -1383,7 +1426,7 @@
     }
 
     /**
-     * ดักจับการพิมพ์/วางข้อความในกล่อง QR เพื่อแยกข้อมูลทันที
+     * ดักจับการพิมพ์/วางข้อความในกล่อง QR และช่องวันหมดอายุ
      */
     function setupQrInputListener() {
       const input = document.getElementById("rawQrInput");
@@ -1392,6 +1435,11 @@
         if (val.includes("#") && val.split("#").length >= 2) {
           fillFromQrText(val);
         }
+      });
+
+      const expInput = document.getElementById("expDate");
+      expInput.addEventListener("input", function () {
+        updateExpirationAlert(this.value);
       });
     }
 
@@ -1414,6 +1462,9 @@
       if (parts[1]) lotEl.value = parts[1];
       if (parts[2]) expEl.value = parts[2];
 
+      // ตรวจสอบวันหมดอายุทันทีเมื่อแยกข้อมูล
+      updateExpirationAlert(expEl.value);
+
       // แสงไฮไลต์สีเขียวบอกว่าแยกข้อมูลสำเร็จ
       [itemEl, lotEl, expEl].forEach(el => {
         if (el.value) {
@@ -1421,6 +1472,79 @@
           setTimeout(() => el.classList.remove("highlight-fill"), 1200);
         }
       });
+    }
+
+    /**
+     * แปลงสตริงวันหมดอายุเป็น Date (รองรับทั้ง YYYY-MM-DD และ DD/MM/YYYY รวมถึง พ.ศ.)
+     */
+    function parseExpirationDate(raw) {
+      if (!raw) return null;
+      const clean = String(raw).trim();
+      let y, m, d;
+
+      // รูปแบบ YYYY-MM-DD หรือ YYYY/MM/DD
+      let match = clean.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
+      if (match) {
+        y = parseInt(match[1], 10);
+        m = parseInt(match[2], 10);
+        d = parseInt(match[3], 10);
+      } else {
+        // รูปแบบ DD/MM/YYYY หรือ DD-MM-YYYY
+        match = clean.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
+        if (!match) return null;
+        d = parseInt(match[1], 10);
+        m = parseInt(match[2], 10);
+        y = parseInt(match[3], 10);
+      }
+
+      if (y >= 2400) y -= 543; // รองรับปี พ.ศ. อัตโนมัติ
+      if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+
+      const dt = new Date(y, m - 1, d);
+      if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) {
+        return null;
+      }
+      dt.setHours(0, 0, 0, 0);
+      return dt;
+    }
+
+    /**
+     * ตรวจสอบเกณฑ์วันหมดอายุ (LA / ISO 15189 Guardrail)
+     * - <= 0 วัน: หมดอายุแล้ว (สีแดง)
+     * - 1 - 90 วัน: แจ้งเตือนจำนวนวันคงเหลือ (สีส้ม)
+     * - > 90 วัน: แจ้งว่าคงเหลือเกิน 90 วัน (สีเขียว)
+     */
+    function updateExpirationAlert(rawExp) {
+      const box = document.getElementById("expAlertBox");
+      if (!box) return "unknown";
+
+      const expDate = parseExpirationDate(rawExp);
+      if (!expDate) {
+        box.className = "exp-alert";
+        box.textContent = "";
+        return "unknown";
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (diffDays <= 0) {
+        const agoText = diffDays === 0 ? "หมดอายุวันนี้!" : `หมดอายุแล้ว ${Math.abs(diffDays)} วัน!`;
+        box.className = "exp-alert expired";
+        box.textContent = `🚨 คำเตือน: น้ำยารายการนี้${agoText} กรุณาตรวจสอบก่อนนำไปใช้งาน`;
+        return "expired";
+      }
+
+      if (diffDays <= 90) {
+        box.className = "exp-alert warning";
+        box.textContent = `⚠️ ใกล้หมดอายุ: เหลืออายุการใช้งานอีก ${diffDays} วัน (เกณฑ์เตือน 1–90 วัน)`;
+        return "warning";
+      }
+
+      box.className = "exp-alert safe";
+      box.textContent = "✅ สถานะวันหมดอายุปกติ: คงเหลืออายุใช้งานเกิน 90 วัน";
+      return "safe";
     }
 
     /**
@@ -1488,6 +1612,16 @@
         return;
       }
 
+      const expVal = document.getElementById("expDate").value.trim();
+      const expStatus = updateExpirationAlert(expVal);
+      if (expStatus === "expired") {
+        const proceedExpired = confirm("🚨 คำเตือน: น้ำยา/วัสดุรายการนี้หมดอายุแล้ว!\n\nต้องการยืนยันการบันทึกรายการนี้หรือไม่?");
+        if (!proceedExpired) {
+          document.getElementById("expDate").focus();
+          return;
+        }
+      }
+
       // บันทึกความจำผู้เบิกและแผนก
       localStorage.setItem("beik_dept", deptVal);
       localStorage.setItem("beik_user", reqVal);
@@ -1499,7 +1633,7 @@
         rawQr: document.getElementById("rawQrInput").value.trim(),
         itemName: itemVal,
         lotNo: document.getElementById("lotNo").value.trim(),
-        expDate: document.getElementById("expDate").value.trim(),
+        expDate: expVal,
         department: deptVal,
         quantity: Number(document.getElementById("quantity").value) || 1,
         requester: reqVal,
@@ -1516,6 +1650,7 @@
       document.getElementById("lotNo").value = "";
       document.getElementById("expDate").value = "";
       document.getElementById("quantity").value = "1";
+      updateExpirationAlert("");
       setTimeout(() => document.getElementById("rawQrInput").focus(), 50);
 
       // 3. ส่งเข้าคิวเบื้องหลังและบันทึกลง localStorage (ไม่หายแม้ล็อกหน้าจอ/รีเฟรช)
